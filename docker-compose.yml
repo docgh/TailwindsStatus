@@ -1,0 +1,10 @@
+version: '3.8'
+services:
+  tailwindsstatus:
+    build: .
+    container_name: tailwindsstatus
+    ports:
+      - "5174:5174"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
