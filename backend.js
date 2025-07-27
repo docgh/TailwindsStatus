@@ -1,5 +1,5 @@
 // backend.js
-// Simple Express backend to proxy weather API requests
+// Simple Express backend to proxy weather API requestshttps://tailwinds.docgreg.com/
 
 const fetch = require("node-fetch").default;
 const cors = require("cors");
@@ -8,12 +8,17 @@ const fs = require("fs");
 const { expr } = require("jquery");
 const path = require("path");
 const loadConfig = require("./loadConfig");
+const parseMetar = require('./parseMetar');
+const parseTAF = require('./parseTAF');
+const aircraftStatus = require('./getAircraftStatus');
 
 const app = express();
 const PORT = 5174;
 
 let cacheData = null;
+let aircraftCacheData = null;
 let cacheTimestamp = 0;
+let aircraftCacheTimestamp = 0;
 
 function setCache(data) {
   cacheData = data;
@@ -31,48 +36,24 @@ function getCache() {
   return null;
 }
 
+function getAircraftCache() {
+if (
+    aircraftCacheData &&
+    Date.now() - aircraftCacheTimestamp <
+      (settings.cache_duration_minutes || 5) * 60 * 1000
+  ) {
+    return aircraftCacheData;
+  }
+  return null;
+}
+
+function setAircraftCache(data) {
+  aircraftCacheData = data;
+  aircraftCacheTimestamp = Date.now();
+}
+
 app.use(cors());
 
-function parseMetar(metar) {
-  // Example METAR: "KPNE 261554Z 32012KT 10SM FEW050 SCT250 27/13 A3007 RMK AO2 SLP181 T02720128"
-  const result = {
-    wind: null,
-    dir: null,
-    speed: null,
-    gust: null,
-    vis: null,
-    clouds: [],
-  };
-  const parts = metar.split(" ");
-  // Wind: e.g. 32012KT or 32012G18KT
-  const windRegex = /([0-9]{3})([0-9]{2,3})(G([0-9]{2,3}))?KT/;
-  for (let part of parts) {
-    if (windRegex.test(part)) {
-      const match = part.match(windRegex);
-      result.wind = part;
-      result.dir = match[1];
-      result.speed = match[2];
-      result.gust = match[4] || null;
-    }
-    if (/^VRB/.test(part)) {
-      // Handle variable wind direction
-      result.wind = "VRB";
-      result.dir = "VRB";
-      result.speed = part.replace("VRB", "").replace("KT", "");
-    }
-    // Visibility: e.g. 10SM
-    if (/^[0-9]+SM$/.test(part)) {
-      result.vis = part.replace("SM", "");
-    }
-    // Clouds: e.g. FEW050, SCT250, BKN100, OVC200
-    if (/^(FEW|SCT|BKN|OVC)[0-9]{3}$/.test(part)) {
-      const type = part.substring(0, 3);
-      const base = parseInt(part.substring(3)) * 100; // in feet
-      result.clouds.push({ type, base });
-    }
-  }
-  return result;
-}
 
 function windComponents(runwayHeading, windDir, windSpeed) {
   // All angles in degrees, windSpeed in knots
@@ -185,35 +166,52 @@ function getColor(data) {
       data.crosswind_caution ||
     data.cloud_caution > ceiling.base ||
     data.vis < data.vis_caution
-  ) {
+  ) {https://aviationweather.gov/
     return "yellow";
   }
   return "green";
 }
 
-// Returns a weather radar image URL for a specified airport/location (ICAO code or lat/lon)
-function getRadarImage(location) {
-  // If location is an ICAO code, use it directly; otherwise, expect { lat, lon }
-  // Example: https://radar.weather.gov/ridge/standard/KPHL_loop.gif
-  // Fallback: use the closest NEXRAD radar site for the airport
-  // For demonstration, assume US ICAO and use the last 3 letters for NEXRAD
-  let radarCode = null;
-  if (typeof location === "string" && location.length === 4) {
-    radarCode = location.substring(1).toUpperCase();
-  } else if (location && location.lat && location.lon) {
-    // For lat/lon, a real implementation would look up the nearest radar site
-    // Here, just return a generic US radar image
-    return "https://radar.weather.gov/ridge/Conus/RadarImg/latest_radaronly.gif";
-  } else {
-    // Default US radar
-    return "https://radar.weather.gov/ridge/Conus/RadarImg/latest_radaronly.gif";
-  }
-  return `https://radar.weather.gov/ridge/standard/K${radarCode}_loop.gif`;
-}
-
 // Example usage:
 const settings = loadConfig();
 // Now you can use settings.airport, settings.runways, etc.
+
+function getRadarImg() {
+  // Returns a radar image URL based on the airport code
+  return `https://radar.weather.gov/ridge/standard/${settings.radar}_loop.gif`;
+}
+
+function checkAllRed(weather) {
+  // Check if weather has keywords that should trigger a red status
+  if (!settings.red_keywords || !Array.isArray(settings.red_keywords)) {  
+    return false;
+  }
+  for (const keyword of settings.red_keywords) {
+    if (weather.weather && weather.weather.includes(keyword)) {
+      return true;
+    }
+    if (weather.taf && weather.taf.tafRaw && weather.taf.tafRaw.includes(keyword)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+app.get("/api/aircraft", async (req, res) => {
+  try {
+    const cached = getAircraftCache();
+    if (cached) {
+      res.json(cached);
+      return;
+    }
+    const aircraft = await aircraftStatus.getAircraftStatus(settings);
+    setAircraftCache(aircraft);
+    res.json(aircraft);
+  } catch (err) {
+    console.error("Error fetching aircraft status:", err);
+    res.status(500).json({ error: "Failed to fetch aircraft status" });
+  }
+});
 
 app.get("/api/weather", async (req, res) => {
   try {
@@ -225,11 +223,21 @@ app.get("/api/weather", async (req, res) => {
     const response = await fetch(
       "https://aviationweather.gov/api/data/metar?ids=" +
         settings.airport +
-        "&hours=0&order=id%2C-obs&sep=true"
+        "&taf=true&hours=0&order=id%2C-obs&sep=true"
     );
     if (!response.ok) throw new Error("Failed to fetch weather data");
     const data = await response.text();
-    const weather = parseMetar(data);
+    const lines = data.split("\n").filter((line) => line.trim());
+    if (lines.length === 0) { // No valid METAR data
+      res.status(500).json({ error: "No valid METAR data received" });
+      return;
+    }
+    const weather = parseMetar(lines[0]);
+    const taf = lines.slice(1).join("\n");
+    if (taf) {  
+      weather.taf = parseTAF('TAF ' + taf, settings);
+    }
+    weather.radar = getRadarImg();
     const returnData = {};
     returnData.weather = weather;
     returnData.runways = [];
@@ -248,6 +256,9 @@ app.get("/api/weather", async (req, res) => {
         returnData.runways.push(runwayData);
       }
     });
+    // Sort runways by headwind descending
+    returnData.runways.sort((a, b) => b.headwind - a.headwind);
+    returnData.allRed = checkAllRed(weather);
     setCache(returnData);
     console.log("Returned: ", JSON.stringify(returnData));
     res.json(returnData);

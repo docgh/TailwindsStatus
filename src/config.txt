@@ -1,5 +1,10 @@
 airport=KPNE
+airport_lat=40.082
+airport_lon=-75.011
+radar=KDIX
+taf_hours=3
 runways=6,24,15,33
+red_keywords=CB,TCU,GR,TS,TSRA,LLWS
 student_wind_caution=10
 student_wind_max=12
 student_wind_x_caution=4
@@ -21,7 +26,17 @@ ifr_wind_max=25
 ifr_wind_x_caution=12
 ifr_wind_x_max=15
 ifr_cloud_caution=800
-ifr_cloud_min=400
+ifr_cloud_min=400 
 ifr_vis_caution=2
-ifr_vis_min=1
+ifr_vis_min=1,
+aircraft=N733PN,N862TW,N861TW,N20105,N489LP
+N733PN_icao24=a9d782
+N862TW_icao24=abd803
+N861TW_icao24=adb44c
+N20105_icao24=a19830
+N489LP_icao24=a60b10
+token_url=https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token
+client_id=
+client_secret=
+
 

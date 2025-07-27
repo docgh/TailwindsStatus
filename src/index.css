@@ -26,11 +26,11 @@ body {
   margin: 0;
   display: flex;
   place-items: center;
-  max-width: 1200px;
+  font-size:1.2em;
 }
 
 h1 {
-  text-align: center;;
+  text-align: center;
   font-size: 3.0em;
   line-height: 1.1;
 }
@@ -38,6 +38,12 @@ h1 {
 p {
   margin-bottom: 5px;
   margin-top: 5px;
+}
+
+.label {
+  position:relative;
+  top: -10px;
+  left: -15px;
 }
 
 .date-span {
@@ -50,26 +56,58 @@ p {
   align-items: center;
 }
 
+.runwaysDiv {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-evenly;
+  align-items: center;
+  max-width: 100%;
+}
+
 .runwayDiv {
-  justify-content: center;
   align-items: center;
   margin: 1em 0;
-  width:100%;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  min-width: 600px;
 }
 
 .rwImg {
-  margin-top:40px;
-  height: 220px;
+  margin-top:50px;
+  height: 300px;
   display: block;
-  width: 49%;
   position: relative
+
 }
 
 .runwayData {
   align-items: center;
   display: inline-block;
-  width: 50%;
+  padding-right: 100px
 }
+
+.radar {
+  position:relative;
+  top: -90px;
+  left: 0px;
+  height: 500px;
+}
+
+.radarDiv {
+  width: 400px;
+  height: 300px;
+  overflow:hidden;
+  padding-left: 20px;
+}
+
+.weatherStatus {
+  width: 400px;
+  padding-top: 20px;
+  margin-right: 20px;
+}
+
 
 .clear {
   clear: both;
@@ -88,12 +126,60 @@ p {
 
 .weatherDiv {
   max-width: 50%;
-  min-width: 360px;
+  min-width: 510px;
   float: left;
+}
+
+.main {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.main .statusBoxesContainer {
+  padding-left: 20px;
 }
 
 .statusDiv {
   padding-top: 20px;
   width: 400px;
-  float: right;
+}
+
+.alert {
+  margin: 5px;
+  background-color: #ebe5e6;
+  color: #721c24;
+  padding: 2px;
+  border-radius: 5px;
+}
+
+.pagedDiv {
+  height: 350px;
+  overflow-y: auto;
+  width: 700px;
+}
+
+.aircraftName {
+  width: 120px;
+  display: inline-block;
+}
+
+.aircraftStatusDiv {
+  margin: 20px;
+  min-width: 350px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  padding: 1em;
+  border-radius: 1em;
+  background: #0e0e0e;
+  border-color: #333;
+  border-style: solid; /* Added border style */
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  max-width: 500px;
+  font-size: 1em;
 }
