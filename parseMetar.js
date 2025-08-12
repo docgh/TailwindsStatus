@@ -97,6 +97,10 @@ function parseMetar(metar) {
       result.vis = part.replace("SM", "");
       continue;
     }
+    if (/^RMK/.test(part)) {
+      // don't parse remarks
+      break;
+    }
     // Clouds: e.g. FEW050, SCT250, BKN100, OVC200
     if (/^(FEW|SCT|BKN|OVC)[0-9]{3,}[A-Z]*$/.test(part)) {
       const coverage = part.substring(0, 3);

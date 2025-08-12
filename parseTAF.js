@@ -14,7 +14,6 @@
         'MI': 'Shallow',
         'PR': 'Partial',
         'SH': 'Showers',
-        'TS': 'Thunderstorm',
         'DU': 'Dust',
         'FU': 'Smoke',
         'PY': 'Spray',
@@ -185,4 +184,4 @@ function printLocalHourMinute(date) {
 }
 
 
-module.exports = parseTAF;
+module.exports = { parseTAF, weatherConditions };

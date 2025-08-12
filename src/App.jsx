@@ -123,8 +123,10 @@ function clear() {
 function WeatherDiv(weather) {
   const div = $("<div>").addClass("weatherDiv");
   div.append($("<h2>").text("Weather Data"));
-  div.append($('<div class="date-span">').text(new Date().toTimeString()));
-  div.append("<br>");
+  div.append($('<span class="wd">').text(
+      "Vis: " + (weather.vis ?? "N/A") + " sm"
+    )
+  );
   div.append(
     $('<span class="wd">').text(
       "Wind Speed: " + (weather.speed ?? "N/A") + " kt"
@@ -229,9 +231,22 @@ function StatusBoxes(statuses, size) {
   return container;
 }
 
-function getTafDiv(taf) {
+// Highlight keywords in a string by wrapping them in a span
+function highlightKeywords(str, keywords) {
+  if (!str || !Array.isArray(keywords) || keywords.length === 0) return str;
+  let result = str;
+  keywords.forEach(word => {
+    // Escape regex special chars in word
+    const safeWord = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(${safeWord})`, 'gi');
+    result = result.replace(regex, '<span class="highlight-keyword">$1</span>');
+  });
+  return result;
+}
+
+function getTafDiv(taf, tafKeywords, nearby) {
   const container = $("<div>").addClass("tafDiv");
-  container.append($("<h2>").text("TAF Forecast" + (taf.station ? " for " + taf.station : "") + (taf.until ? " until " + taf.until : "")));
+  container.append($("<h2>").text((nearby ? "Nearby " : "TAF") + " Forecast" + (taf.station ? " for " + taf.station : "") + (taf.until ? " until " + taf.until : "")));
   if (!taf || !taf.periods || taf.periods.length === 0) {
     container.append($("<p>").text("No TAF data available"));
     return container;
@@ -239,7 +254,7 @@ function getTafDiv(taf) {
   taf.periods.forEach((period) => {
     const periodDiv = $("<div>").addClass("tafPeriod");
     if (period.timeLocal) {
-      periodDiv.append($("<p>").text("Local: " + period.timeLocal.substring(0, 5)));
+      periodDiv.append($("<p>").html("Local: <span class='time'>" + period.timeLocal.substring(0, 5) + "</span>"));
     }
     const periodWeather = $("<p>");
     if (period.tempo) {
@@ -248,8 +263,8 @@ function getTafDiv(taf) {
     if (period.prob) {
       periodWeather.append("Prob: " + period.prob + "%");
       periodDiv.append(
-        $("<p>").text(
-          "From: " + period.probStart + " to " + period.probEnd
+        $("<p>").html(
+          "From: <span class='time'>" + period.probStart + "</span> to <span class='time'>" + period.probEnd + "</span>"
         )
       );
     }
@@ -260,7 +275,7 @@ function getTafDiv(taf) {
       periodWeather.append( " " + period.vis + " SM");
     }
     if (period.weather) {
-      periodWeather.append(" " + period.weather);
+      periodWeather.append(" " + highlightKeywords(period.weather, tafKeywords));
     }
     if (period.clouds && period.clouds.length > 0) {
       const cloudsList = $("<span>").addClass("cloudsList");
@@ -268,7 +283,7 @@ function getTafDiv(taf) {
         if (index > 0) cloudsList.append(", ");
         cloudsList.append(" " + cloud.coverage + " at " + cloud.base + " ft");
         if (cloud.type) {
-          cloudsList.append("<span class='alert'> (" + cloud.type + ")</span>");
+          cloudsList.append("<span class='alert'>(" + cloud.type + ")</span>");
         }
       });
       periodWeather.append(cloudsList);
@@ -322,7 +337,18 @@ function PagedDiv(pages) {
   return container;
 }
 
+
+
 function App() {
+
+  // Check if current time is between 11pm and 6am
+  const now = new Date();
+  const hour = now.getHours();
+  if (hour >= 23 || hour < 6) {
+    screensaver();
+    return;
+  }
+
   let data;
   const mainDiv = $('<div class="main">');
   const node = $('<div class="runwaysDiv">');
@@ -332,18 +358,34 @@ function App() {
     const weatherStatusDiv = $('<div class="weatherStatus">');
     weatherStatusDiv.append(statusDiv(data.runways, data.allRed));
     weatherStatusDiv.append($('<div class="radarDiv">').append($('<img class="radar">').attr("src", data.weather.radar)))
-    const pageDiv = PagedDiv([getTafDiv(data.weather.taf), ColorExplanationDiv()]);
+    const pages = [getTafDiv(data.weather.taf, data.weather.taf_keywords)];
+    if (data.weather.nearby_tafs && data.weather.nearby_tafs.length > 0) {
+      data.weather.nearby_tafs.forEach((taf) => {
+        pages.push(getTafDiv(taf, data.weather.taf_keywords, true));
+      });
+    }
+    pages.push(ColorExplanationDiv());
+    const pageDiv = PagedDiv(pages);
     mainDiv.append(WeatherDiv(data.weather).append(pageDiv));
     mainDiv.append(weatherStatusDiv);
     mainDiv.append(AircraftStatusDiv(data.aircraft || []));
     if (data.runways && data.runways.length > 0) {
       setRunways(node, data);
     }
+     // Reload the page every 5 minutes (300,000 ms)
+    const freq = data.update_frequency || 5; // Use update_frequency from data or default to 5 minutes
+    setTimeout(() => {
+      window.location.reload();
+    }, freq * 60 * 1000);
   }
   const body = $('<div class="weather-main">');
   body.append(
     $('<div class="title">')
       .append($("<img>").attr("src", logo).attr("height", "75px"))
+  );
+  body.append(
+    $('<div class="clock">')
+      .text(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))  
   );
   body.append(mainDiv);
   body.append(clear());
@@ -378,7 +420,7 @@ function ColorExplanationDiv() {
   });
   container.append(
     $('<div>').css({ display: 'flex', alignItems: 'center', marginBottom: '0.5em' })
-      .append($('<span>').css({ background: 'green', width: '70px', color: '#fff', borderRadius: '0.5em', padding: '0.3em 1em', marginRight: '1em', fontWeight: 'bold' }).text('Green'))
+      .append($('<span>').css({ background: 'green', width: '80px', color: '#fff', borderRadius: '0.5em', padding: '0.3em 1em', marginRight: '1em', fontWeight: 'bold' }).text('Green'))
       .append($('<span>').text('May be OK for departure'))
   );
   container.append(
@@ -392,6 +434,33 @@ function ColorExplanationDiv() {
       .append($('<span>').text('Some red flags.  Evaluate if flying will be safe'))
   );
   return container;
+}
+
+// Screensaver function: puts an image randomly on the screen each time it is called
+function screensaver() {
+  // Remove any previous screensaver image
+  $(".screensaver-img").remove();
+  const img = $("<img>")
+    .attr("src", logo)
+    .addClass("screensaver-img")
+    .css({
+      position: "fixed",
+      zIndex: 9999,
+      pointerEvents: "none",
+      width: "150px",
+      height: "auto"
+    });
+  // Get viewport size
+  const vw = $(window).width();
+  const vh = $(window).height();
+  // Random position (ensure image stays within viewport)
+  const left = Math.floor(Math.random() * (vw - 150));
+  const top = Math.floor(Math.random() * (vh - 150));
+  img.css({ left: left + "px", top: top + "px" });
+  $(document.body).append(img);
+  setTimeout(() => {
+      window.location.reload();
+    }, 60000); // 1 minute
 }
 
 export default App;

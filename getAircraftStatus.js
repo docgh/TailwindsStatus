@@ -19,7 +19,24 @@ async function getAircraftStatus(settings) {
         };
     });
 
-    const response = await queryOpenSkyStates(getIcao24List(settings));
+    let response = null;
+    try {
+        response = await queryOpenSkyStates(getIcao24List(settings));
+    }
+    catch (err) {  // If the initial query fails, we will try to refresh the token and query again
+        if (oauthToken === null) {
+            oauthToken = await getOAuth2Token(settings.token_url, settings.client_id, settings.client_secret);
+            try {
+                response = await queryOpenSkyStates(getIcao24List(settings));
+            } catch (err) {
+                console.error("Failed to query OpenSky API after token refresh:", err);
+                return [];
+            }
+        } else {
+            console.error("Failed to query OpenSky API:", err);
+            return [];
+        }
+    }
     if (response.states === null || response.states.length === 0) {
         console.warn("No aircraft states found in OpenSky response");
         return aircraft_status;

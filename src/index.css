@@ -40,10 +40,28 @@ p {
   margin-top: 5px;
 }
 
+.title {
+  display: inline-block;
+}
+
+.clock {
+  display:inline-block;
+  float: right;
+  margin-right: 20px;
+  font-size: 2em;
+}
+
 .label {
   position:relative;
   top: -10px;
   left: -15px;
+}
+
+.highlight-keyword {
+  background-color: rgb(255, 81, 0);
+  color: #000;
+  padding: 2px 4px;
+  border-radius: 3px;
 }
 
 .date-span {
@@ -157,7 +175,7 @@ p {
 }
 
 .pagedDiv {
-  height: 350px;
+  height: 400px;
   overflow-y: auto;
   width: 700px;
 }
@@ -165,6 +183,12 @@ p {
 .aircraftName {
   width: 120px;
   display: inline-block;
+}
+
+.time {
+  color: #fff;
+  font-size: 1.1em;
+  font-weight: bold;
 }
 
 .aircraftStatusDiv {

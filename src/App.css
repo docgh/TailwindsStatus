@@ -74,3 +74,8 @@ h1 {
 .weather-box h2 {
   margin: 0 0 0.5em 0;
 }
+
+.grounded {
+  color: red;
+  font-weight: bold;
+}

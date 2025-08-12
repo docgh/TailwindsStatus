@@ -17,18 +17,23 @@ function AircraftStatusDiv(aircraftList) {
     const item = $('<li>').addClass('aircraftItem');
     item.append($('<span>').addClass('aircraftName').css({ fontWeight: 'bold', marginRight: '1em' }).text(ac.name || 'Unknown'));
     let location = ac.location ? `${ac.location}` : 'Location: Unknown';
+    const locationSpan = $('<span>').addClass('aircraftLocation');
     if (ac.distance && ac.altitude) {
       location = `Dist: ${ac.distance}, Alt: ${ac.altitude} ft`;
+    } else { // If not in air, show if checked out, grounded, or in maintenance
+      if (ac.checkedOut) {
+        location = 'Checked Out';
+        locationSpan.css({ color: 'green', fontWeight: 'bold' }); // Highlight checked out aircraft
+      }
+      if (ac.grounded) {
+        location = 'Unavailable';
+        locationSpan.css({ color: 'red', fontWeight: 'bold' }); // Highlight grounded aircraft
+      }
+      if (ac.maintenance) {
+        location = 'Maintenance';
+        locationSpan.css({ color: 'orange', fontWeight: 'bold' }); // Highlight aircraft in maintenance
+      } 
     }
-    const locationSpan = $('<span>').addClass('aircraftLocation')
-    if (ac.grounded) {
-      location = ' (Grounded)';
-      locationSpan.css({ color: 'red', fontWeight: 'bold' }); // Highlight grounded aircraft
-    }
-    if (ac.maintenance) {
-      location = ' (Maintenance)';
-      locationSpan.css({ color: 'orange', fontWeight: 'bold' }); // Highlight aircraft in maintenance
-    } 
     item.append(locationSpan.append(location));
     list.append(item);
   });
