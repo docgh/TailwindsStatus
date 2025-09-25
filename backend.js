@@ -1,6 +1,3 @@
-
-
-
 // backend.js
 // Simple Express backend to proxy weather API requestshttps://tailwinds.docgreg.com/
 
@@ -17,6 +14,8 @@ const aircraftStatus = require('./getAircraftStatus');
 const { updateAircraft } = require("./Fsp");
 const { getRunwayData } = require("./analysis");
 const maintStatus = require("./maintStatus");
+const { sendNotification, handleSms, checkSmsEnabled } = require("./notification");
+const mysql = require("./mysql");
 
 const app = express();
 const PORT = 5174;
@@ -64,6 +63,35 @@ app.use(cors());
 const settings = loadConfig();
 // Now you can use settings.airport, settings.runways, etc.
 
+// Periodically check squawks every 5 minutes
+async function checkSquawks() {
+  try {
+    await maintStatus.getMaintStatus(settings); // Refresh maintenance status and squawks
+    const diff = maintStatus.getSquawkDiff();
+    if (diff.length > 0) {
+      console.log("New squawks detected:", diff);
+      let message = "TailWinds Status\nNew squawks:\n";
+      diff.forEach(sq => {
+        message += `- [${sq.tailNumber || 'Unknown Aircraft'}]: `;
+        message += `- ${sq.description} `;
+        if (sq.groundAircraft) {
+          message += `-- Grounded!`;
+        }
+        message += `\n`;
+      });
+      // Here you can send a notification or handle the new squawks as needed
+      await sendNotification(settings, message);
+    } else {
+      console.log("No new squawks detected.");
+    }
+  } catch (err) {
+    console.error("Error in checkSquawks:", err);
+  }
+}
+
+// Run checkSquawks every 5 minutes
+setInterval(checkSquawks, 5 * 60 * 1000);
+
 function getRadarImg() {
   // Returns a radar image URL based on the airport code
   return `https://radar.weather.gov/ridge/standard/${settings.radar}_loop.gif`;
@@ -109,8 +137,10 @@ function checkAllRed(weather) {
 }
 
 
+
 app.get("/api/maint", async (req, res) => {
   try {
+    await checkSquawks(); // Ensure squawks are checked before fetching maintenance status
     const aircraft = await maintStatus.getMaintStatus(settings);
     if (!aircraft || aircraft.length === 0) {
       res.json({ error: "No aircraft maintenance data available" });
@@ -146,6 +176,8 @@ app.get("/api/aircraft", async (req, res) => {
   }
 });
 
+
+
 async function getNearby(weatherdata) {
   await Promise.all(settings.nearby.map(async (airport) => {
     // Fetch TAF for each nearby airport
@@ -164,7 +196,7 @@ async function getNearby(weatherdata) {
     const taf = lines.slice(1).join("\n");
     if (taf) {  
       if (!weatherdata.nearby_tafs) weatherdata.nearby_tafs = [];
-      weatherdata.nearby_tafs.push(parseTAF('TAF ' + taf, settings));
+      weatherdata.nearby_tafs.push(parseTAF(taf, settings));
     }
   }));
 }
@@ -191,7 +223,7 @@ app.get("/api/weather", async (req, res) => {
     const weather = parseMetar(lines[0]);
     const taf = lines.slice(1).join("\n");
     if (taf) {  
-      weather.taf = parseTAF('TAF ' + taf, settings);
+      weather.taf = parseTAF(taf, settings);
     }
     await getNearby(weather);
     weather.radar = getRadarImg();
@@ -227,6 +259,13 @@ app.get("/api/weather", async (req, res) => {
 });
 
 app.use(express.static(path.join(__dirname, "dist"), { extensions: ['html', 'htm'] }));
+
+// Check if SMS is enabled at startup
+checkSmsEnabled(settings);
+
+app.post("/api/sms", express.urlencoded({ extended: false }), (req, res) => {
+  return handleSms(req, res, settings);
+});
 
 app.listen(PORT, () => {
   console.log(`Backend API server running on http://localhost:${PORT}`);

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SMS Signup - A2P 10DLC Compliant</title>
+    <link rel="stylesheet" href="./src/App.css" />
+    <style>
+      .signup-main { max-width: 500px; margin: 2em auto; padding: 2em; border-radius: 1em; background: #f9f9f9; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+      .signup-main h1 { margin-bottom: 1em; }
+      .signup-main label { display: block; margin-top: 1em; }
+      .signup-main input, .signup-main select { width: 100%; padding: 0.5em; margin-top: 0.5em; border-radius: 0.5em; border: 1px solid #ccc; }
+      .signup-main button { margin-top: 1.5em; padding: 0.7em 2em; border-radius: 0.5em; background: #0077cc; color: #fff; border: none; font-weight: bold; cursor: pointer; }
+      .signup-main .info { font-size: 0.9em; color: #555; margin-top: 1em; }
+      .signup-main .success { color: green; margin-top: 1em; }
+      .signup-main .error { color: red; margin-top: 1em; }
+    </style>
+  </head>
+  <body>
+    <div class="signup-main">
+      <h1>Tailwinds SMS Signup</h1>
+      <form id="sms-signup-form">
+        <label for="name">Full Name</label>
+        <input type="text" id="name" name="name" required />
+        <label for="phone">Mobile Number (US only, e.g. +1XXXXXXXXXX)</label>
+        <input type="tel" id="phone" name="phone" pattern="^\+1\d{10}$" required />
+        <label for="consent">
+          <input type="checkbox" id="consent" name="consent" required style="width: 20px;"/>
+          I consent to receive SMS notifications from Tailwinds Flight Academy.
+        </label>
+        <div class="info">
+          By signing up, you agree to receive automated SMS notifications. Message & data rates may apply. Reply STOP to unsubscribe.
+        </div>
+        <button type="submit">Sign Up</button>
+        <div id="signup-result"></div>
+      </form>
+    </div>
+    <script type="module">
+      import $ from 'jquery';
+      $(function() {
+        $('#sms-signup-form').on('submit', async function(e) {
+          e.preventDefault();
+          const name = $('#name').val().trim();
+          const From = $('#phone').val().trim();
+          const consent = $('#consent').is(':checked');
+          const Body = 'add'; // implicit command for signup
+          const resultDiv = $('#signup-result').empty();
+          if (!name || !phone || !consent) {
+            resultDiv.text('Please fill out all fields and provide consent.').addClass('error');
+            return;
+          }
+          if (!/^\+1\d{10}$/.test(From)) {
+            resultDiv.text('Please enter a valid US mobile number in the format +1XXXXXXXXXX.').addClass('error');
+            return;
+          }
+          // Send signup data to backend
+          try {
+            let url = './api/sms';
+            const host = window.location.hostname;
+            if (host === "192.168.0.2") {  // Development environment
+              url = "http://192.168.0.2:5174/api/sms";
+            } 
+            const response = await fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: new URLSearchParams({ name, From, consent, Body })
+            });
+            const data = await response.json();
+            if (response.ok) {
+              if (data.message && data.message == "Phone number added to squawk list.") {
+                resultDiv.text('Signup successful! You will receive SMS notifications.').addClass('success');
+                $('#sms-signup-form')[0].reset();
+              } else {
+                resultDiv.text(data.message).addClass('error');
+                return;
+              }
+            } else {
+              resultDiv.text(data.error || 'Signup failed.').addClass('error');
+            }
+          } catch (err) {
+            resultDiv.text('Error submitting signup: ' + err.message).addClass('error');
+          }
+        });
+      });
+    </script>
+  </body>
+</html>

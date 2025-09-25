@@ -332,7 +332,7 @@ function PagedDiv(pages) {
     timer = setInterval(() => {
       current = (current + 1) % pages.length;
       showPage(current);
-    }, 5000);
+    }, 10000);
   });
   return container;
 }

@@ -70,19 +70,19 @@ function parseTAF(tafText, settings) {
       }
     } else if (tokens[0].startsWith('TEMPO')) {
       period.tempo = true;
-      period.time = tokens[0].substring(5);
+      period.time = tokens[1].substring(0,4);
       period.timeLocal = printLocalHourMinute(timeToLocal(period.time));
     } else if (tokens[0].startsWith('PROB')) {
       period.prob = tokens[0].substring(4);
-      period.probStart = getLocalTime(tokens[1].substring(0, 4));
-      period.probEnd = getLocalTime(tokens[1].substring(5, 9));
+      period.probStart = getLocalTime(tokens[1].substring(2, 4));
+      period.probEnd = getLocalTime(tokens[1].substring(7, 9));
     } else if (tokens[0].startsWith('TAF')) {
       period.from = result.valid;
     }
     // Parse wind, visibility, clouds
     tokens.forEach((token, index) => {
       let done = false;
-      if (/^[0-9]{5}KT$/.test(token)) {
+      if (/([0-9]{3})([0-9]{2,3})(G([0-9]{2,3}))?KT/.test(token)) {
         period.wind = token;
         done = true;
       }
@@ -153,6 +153,13 @@ function getLocalTime(dur) {
     if (dur.length == 4) {
         const hour = dur.substring(0, 2);
         const min = dur.substring(2, 4);
+        const hourDif = new Date().getTimezoneOffset() / 60;
+        const localHour = (Number(hour) - hourDif + 24) % 24;
+        return `${String(localHour).padStart(2, '0')}:${min}`;
+    }
+    if (dur.length == 2) {
+        const hour = dur.substring(0, 2);
+        const min = '00'; // Default to '00' if minutes not provided
         const hourDif = new Date().getTimezoneOffset() / 60;
         const localHour = (Number(hour) - hourDif + 24) % 24;
         return `${String(localHour).padStart(2, '0')}:${min}`;

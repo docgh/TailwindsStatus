@@ -8,7 +8,8 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: 'index.html',
-        maint: 'maint.html'
+        maint: 'maint.html',
+        sms: 'sms_signup.html'
       }
     }
   }

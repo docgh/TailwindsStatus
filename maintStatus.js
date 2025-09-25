@@ -2,6 +2,11 @@ const fetch = require("node-fetch").default;
 
 let maintCache = null;
 let maintCacheTimestamp = 0;
+let lastSquawk = null;
+let squawkDiff = null;
+
+let prior = [];
+let test = false;
 
 function getCache() {
   const now = Date.now();
@@ -55,7 +60,7 @@ async function getAircraftMaintenanceStatus(subscriptionKey, operator_id, aircra
   return response.json();
 }
 
-async function getAircraftSquawks(subscriptionKey, operator_id, aircraftId) {
+async function getAircraftSquawks(subscriptionKey, operator_id, aircraftId, aircraft) {
   const url = `https://usc-api.flightschedulepro.com/core/v1.0/operators/${operator_id}/aircraft/${aircraftId}/squawks`;
 
   const response = await fetch(url, {
@@ -68,7 +73,22 @@ async function getAircraftSquawks(subscriptionKey, operator_id, aircraftId) {
     console.warn(`Failed to fetch squawks for aircraft ${aircraftId}: ${response.status} ${response.statusText}`);
     return null;
   }
-  return response.json(); 
+  return response.json().then(data => {
+    const tailNumber = aircraft.filter(ac => ac.aircraftId === aircraftId)[0].tailNumber;
+    data.items.forEach(sq => {
+      sq.tailNumber = tailNumber;
+    });
+    return data.items.filter(sq => !sq.resolved);
+  });
+}
+
+function getSquawkDiff() {
+  if (squawkDiff === null || squawkDiff.length === 0) {
+    return [];
+  }
+  const diff = squawkDiff;
+  squawkDiff = null; // Reset after getting the diff
+  return diff;
 }
 
 async function getMaintStatus(settings) {
@@ -85,15 +105,46 @@ async function getMaintStatus(settings) {
     // Fetch maintenance status for each aircraft
     const maintStatusPromises = await aircraft.map(async ac => await getAircraftMaintenanceStatus(fsp_subscription_key, fsp_operator_id, ac.aircraftId));
     // Fetch squawks for each aircraft
-    const squawkPromises = await aircraft.map(async ac => await getAircraftSquawks(fsp_subscription_key, fsp_operator_id, ac.aircraftId));
+    const squawkPromises = await aircraft.map(async ac => await getAircraftSquawks(fsp_subscription_key, fsp_operator_id, ac.aircraftId, aircraft));
     return Promise.all([maintStatusPromises, squawkPromises]).then(async (results) => {
         const maintStatus = await Promise.all(results[0]);
         const squawks = await Promise.all(results[1]);
+          if (lastSquawk !== null) {
+            // Find new squawks not already in lastSquawk (by id or title/desc)
+            let diff = [];
+            squawks.forEach(apList => {
+              (apList || []).forEach(ap => {
+                // Check if lastSquawk already contains this squawk
+                const exists = lastSquawk.some(sq =>
+                  (ap.squawkId && sq.squawkId && ap.squawkId === sq.squawkId)
+                );
+                if (!exists) diff.push(ap);
+              });
+            });
+            if (diff.length > 0) {
+              console.log(`Found ${diff.length} new squawks`);
+              lastSquawk.push(...diff);
+              if (squawkDiff === null) {
+                squawkDiff = [];
+              }
+              squawkDiff.push(...diff);
+            }
+          } else {
+            // Reset list of squawks
+            lastSquawk = [];
+            squawks.forEach(ap => {
+              ap.forEach(sq => {
+                if (sq && !sq.resolved) {
+                  lastSquawk.push(sq);
+                }
+              });
+            });
+          }
         const result = aircraft.map((ac, index) => {
             return {
                 ...ac,
                 maintenance: maintStatus[index].items.filter(m => m.status && m.status.id && m.status.id !== 1), // only include active maintenance reminders || null,
-                squawks: squawks[index].items.filter(s => !s.resolved) || []
+                squawks: squawks[index] || []
             };
         });
         setCache(result);
@@ -102,3 +153,4 @@ async function getMaintStatus(settings) {
 }
 
 exports.getMaintStatus = getMaintStatus;
+exports.getSquawkDiff = getSquawkDiff;
