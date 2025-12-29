@@ -51,6 +51,19 @@ async function removePhoneNumber(settings, phone) {
   }
 }
 
+async function updatePhoneFilter(settings, phone, filter) {
+  const conn = await mysql.createConnection(getDbConfig(settings));
+  try {
+    await conn.execute('UPDATE squawk_list SET filter = ? WHERE phone = ?', [filter, phone]);
+    await conn.end();
+    return true;
+  } catch (err) {
+    console.error('Error updating phone number filter:', err);
+    await conn.end();
+    return false;
+  }
+}
+
 /**
  * Get all phone numbers from squawk_list
  * @param {Object} settings - The settings object
@@ -59,9 +72,9 @@ async function removePhoneNumber(settings, phone) {
 async function getPhoneNumbers(settings) {
   const conn = await mysql.createConnection(getDbConfig(settings));
   try {
-    const [rows] = await conn.execute('SELECT phone FROM squawk_list');
+    const [rows] = await conn.execute('SELECT phone, filter FROM squawk_list');
     await conn.end();
-    return rows.map(row => row.phone);
+    return rows;
   } catch (err) {
     console.error('Error fetching phone numbers:', err);
     await conn.end();
@@ -69,4 +82,4 @@ async function getPhoneNumbers(settings) {
   }
 }
 
-module.exports = { addPhoneNumber, removePhoneNumber, getPhoneNumbers };
+module.exports = { addPhoneNumber, removePhoneNumber, getPhoneNumbers, updatePhoneFilter };

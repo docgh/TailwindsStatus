@@ -48,7 +48,9 @@ async function updateAircraft(aircraft, settings) {
             if (existing) {
                 if (fspItem.aircraftAvailability === "Unavailable") {
                     existing.grounded = true;
-                }   
+                } else {
+                    existing.grounded = false;
+                }
             }
         });
     }

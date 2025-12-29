@@ -8,13 +8,21 @@ const { send } = require('vite');
 
 let sms_enabled = false;
 
+function filterTailNumbers(tailNumbers, filter) {
+    if (!filter || filter.trim() === '') {
+        return true; // No filter means send to all
+    }
+    const filters = filter.split(',').map(f => f.trim().toLowerCase());
+    return tailNumbers.some(tail => filters.includes(tail.toLowerCase()));
+}
+
 /**
  * Send an SMS message to a list of recipients using Twilio
  * @param settings
  * @param {string} message - The message to send
  * @returns {Promise<Array>} - Array of Twilio message responses
  */
-async function sendSmsNotification(settings, message) {
+async function sendSmsNotification(settings, message, tailNumbers=[]) {
     if (!sms_enabled) {
         console.log("Twilio settings are not properly configured.");
         return [];
@@ -24,10 +32,18 @@ async function sendSmsNotification(settings, message) {
   const results = [];
   for (const to of recipients) {
     try {
+      if (!filterTailNumbers(tailNumbers, to.filter)) {
+        console.log(`Skipping phone number ${to.phone} due to filter.`);
+        continue;
+      }
+      if (settings.develop) {
+        console.log(`Development mode - not sending to ${to.phone} notification: ` + message);
+        continue;
+      }
       const msg = await client.messages.create({
         body: message,
         from: settings.twilio_number,
-        to
+        to: to.phone
       });
       results.push({ to, status: 'sent', sid: msg.sid });
     } catch (err) {
@@ -40,8 +56,11 @@ async function sendSmsNotification(settings, message) {
 // Send a welcome message when a user signs up
 async function sendWelcome (settings, to) {
   if (!sms_enabled) {
-      console.log("Twilio settings are not properly configured.");
-      return [];
+      await checkSmsEnabled(settings); // Check on more time (maybe database was down)
+      if (!sms_enabled) {
+        console.log("Twilio settings are not properly configured.");
+        return [];  
+      }
   }
   const client = twilio(settings.twilio_sid, settings.twilio_auth_token);
   try {
@@ -86,7 +105,7 @@ function handleSms(req, res, settings) {
     return;
   }
   const command = Body.trim().toLowerCase();
-  if (command === 'add') {
+  if (command === 'add' || command === 'start') {
     // Add the phone number to the squawk list
     mysql.addPhoneNumber(settings, From).then((added) => {  
       if (added) {
@@ -113,13 +132,49 @@ function handleSms(req, res, settings) {
       }
     });
     return;
+  } else if (command === 'help') {
+    sendResponse(res, "Available commands:\nADD - Add your number to the squawk list\nREMOVE or STOP - Remove your number from the squawk list\nFILTER - Filter notifications by tail number", isSMS);
+    return;
+  } else if (command.startsWith('filter')) {
+    let filterValue = Body.substring(6).trim(); // Get text after 'filter'
+    if (!filterValue) {
+      sendResponse(res, "Please provide tail numbers to filter by, separated by commas. Example: FILTER N123AB,N456CD.  FILTER NONE to remove all filters", isSMS);
+      return;
+    }
+    if (filterValue.toLowerCase() === 'none') {
+      filterValue = null; // Clear filter
+    } else {
+      let filterSet = filterValue.split(',').map(f => f.trim().toUpperCase());
+      let ok = true;
+      filterSet.forEach(async (filter) => {
+        if (filter && !/^[A-Z0-9]{1,7}$/.test(filter) && settings.aircraft.indexOf(filter) === -1) {
+          ok = false;
+        }
+      });
+      if (!ok) {
+        sendResponse(res, "Invalid tail number format in filter. Please provide valid tail numbers separated by commas.", isSMS);
+        return;
+      }
+    }
+    // Update the filter for this phone number in the database
+    mysql.updatePhoneFilter(settings, From, filterValue).then((updated) => {
+      if (updated) {  
+        console.log(`Updated filter for phone number ${From} to: ${filterValue}`);
+        sendResponse(res, `Filter updated to: ${filterValue == null ? 'none' : filterValue}`, isSMS);
+      } else {
+        console.log(`Failed to update filter for phone number ${From}`);
+        sendResponse(res, "Failed to update filter. Please try again later.", isSMS);
+      }
+    });
+    
+    return; 
   } else {
   // Respond with TwiML (empty response is OK for most cases)
     sendResponse(res, "Unknown code. Response handling in development.  Contact Greg for assistance.", isSMS);
   }
 };
 
-async function sendNotification(settings, message) {
+async function sendNotification(settings, message, tailNumbers=[]) {
   try {
     if (settings.email) {
       // Send email notification
@@ -127,7 +182,7 @@ async function sendNotification(settings, message) {
       console.log("Email notification results:", emailResults);
     } else {
       // Send SMS notification
-      const smsResults = await sendSmsNotification(settings, message);
+      const smsResults = await sendSmsNotification(settings, message, tailNumbers);
       console.log("SMS notification results:", smsResults);
     }
   } catch (err) {

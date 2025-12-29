@@ -35,6 +35,9 @@ function renderMaintPage() {
         background: "#f9f9f9"
       });
       acDiv.append($("<h2>").text(ac.name || ac.registrationTail || ac.tailNumber || "Aircraft"));
+      if (ac.grounded) {
+        acDiv.append($("<div>").text("Status: Grounded").css({ color: "red", fontWeight: "bold" }));
+      }
             // Squawks
       acDiv.append($("<h3>").text("Squawks"));
       if (Array.isArray(ac.squawks) && ac.squawks.length > 0) {

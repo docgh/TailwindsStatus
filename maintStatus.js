@@ -1,9 +1,13 @@
+const e = require("cors");
+
 const fetch = require("node-fetch").default;
 
 let maintCache = null;
 let maintCacheTimestamp = 0;
 let lastSquawk = null;
+let resolvedSquawks = [];
 let squawkDiff = null;
+let aircraftList = null;
 
 let prior = [];
 let test = false;
@@ -91,6 +95,38 @@ function getSquawkDiff() {
   return diff;
 }
 
+function getResolvedSquawks() {
+  if (resolvedSquawks === null || resolvedSquawks.length === 0) {
+    return [];
+  }
+  const resolved = resolvedSquawks;
+  resolvedSquawks = []; // Reset after getting the resolved squawks
+  return resolved;
+}
+
+function updateGrounded(squawks, settings) {
+    if (aircraftList === null) {
+        aircraftList = settings.aircraft.map(acName => {
+            return { tailNumber: acName, grounded: false };
+        });
+    }
+    aircraftList.forEach(ac => {
+      let hasGroundingSquawk = false;
+      squawks.forEach(sq => {
+        if (sq === null) return;
+        hasGroundingSquawk = hasGroundingSquawk || sq.some(s => s.tailNumber === ac.tailNumber && s.groundAircraft);
+      });
+      ac.grounded = hasGroundingSquawk;
+    });
+}
+
+function getAircraftGroundingStatus() {
+    if (aircraftList === null) {
+        return [];
+    } 
+    return aircraftList;;
+}
+
 async function getMaintStatus(settings) {
     const cached = getCache();
     if (cached) {   
@@ -109,6 +145,7 @@ async function getMaintStatus(settings) {
     return Promise.all([maintStatusPromises, squawkPromises]).then(async (results) => {
         const maintStatus = await Promise.all(results[0]);
         const squawks = await Promise.all(results[1]);
+        updateGrounded(squawks, settings);
           if (lastSquawk !== null) {
             // Find new squawks not already in lastSquawk (by id or title/desc)
             let diff = [];
@@ -129,6 +166,17 @@ async function getMaintStatus(settings) {
               }
               squawkDiff.push(...diff);
             }
+            // Check if any squawks have been resolved since last check
+            lastSquawk.forEach(sq => {
+              const stillExists = squawks.some(apList =>
+                (apList || []).some(ap => ap.squawkId === sq.squawkId && ap.resolved === sq.resolved)
+              );
+              if (!stillExists) {
+                console.log(`Resolved squawk: ${sq.squawkId}`);
+                resolvedSquawks.push(sq);
+                lastSquawk = lastSquawk.filter(s => s.squawkId !== sq.squawkId); // remove resolved squawk from lastSquawk
+              }
+            });
           } else {
             // Reset list of squawks
             lastSquawk = [];
@@ -144,7 +192,8 @@ async function getMaintStatus(settings) {
             return {
                 ...ac,
                 maintenance: maintStatus[index].items.filter(m => m.status && m.status.id && m.status.id !== 1), // only include active maintenance reminders || null,
-                squawks: squawks[index] || []
+                squawks: squawks[index] || [],
+                grounded: aircraftList.find(a => a.tailNumber === ac.tailNumber)?.grounded || false
             };
         });
         setCache(result);
@@ -154,3 +203,5 @@ async function getMaintStatus(settings) {
 
 exports.getMaintStatus = getMaintStatus;
 exports.getSquawkDiff = getSquawkDiff;
+exports.getResolvedSquawks = getResolvedSquawks;
+exports.getAircraftGroundingStatus = getAircraftGroundingStatus;

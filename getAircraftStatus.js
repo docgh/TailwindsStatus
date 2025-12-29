@@ -1,5 +1,6 @@
 
 const fetch = require("node-fetch").default;
+const { updateAircraft } = require("./Fsp");
 
 let oauthToken = null;
 
@@ -38,7 +39,8 @@ async function getAircraftStatus(settings) {
         }
     }
     if (response.states === null || response.states.length === 0) {
-        console.warn("No aircraft states found in OpenSky response");
+        //console.warn("No aircraft states found in OpenSky response");
+        await updateAircraft(aircraft_status, settings);
         return aircraft_status;
     }
     response.states.map(state => {
@@ -54,10 +56,11 @@ async function getAircraftStatus(settings) {
             ).toFixed(2) + " mi";
             ac.altitude = metersToFeet(state[7]);
             ac.velocity = state[9];
-            ac.grounded = state[8] === 0; // Assuming grounded if vertical rate is zero
+            //ac.grounded = state[8] === 0; // Assuming grounded if vertical rate is zero
             ac.maintenance = false; // Placeholder, can be set based on additional logic
         }
     });
+    await updateAircraft(aircraft_status, settings);
     return aircraft_status;
 }
 

@@ -11,7 +11,6 @@ const loadConfig = require("./loadConfig");
 const parseMetar = require('./parseMetar');
 const { parseTAF, weatherConditions } = require('./parseTAF');
 const aircraftStatus = require('./getAircraftStatus');
-const { updateAircraft } = require("./Fsp");
 const { getRunwayData } = require("./analysis");
 const maintStatus = require("./maintStatus");
 const { sendNotification, handleSms, checkSmsEnabled } = require("./notification");
@@ -24,6 +23,7 @@ let cacheData = null;
 let aircraftCacheData = null;
 let cacheTimestamp = 0;
 let aircraftCacheTimestamp = 0;
+let oldStatus = [];
 
 function setCache(data) {
   cacheData = data;
@@ -63,15 +63,22 @@ app.use(cors());
 const settings = loadConfig();
 // Now you can use settings.airport, settings.runways, etc.
 
+// Log aircraft
+settings.aircraft.forEach(ac => {
+    console.log(`Configured aircraft: ${ac}, ICAO24: ${settings[ac + "_icao24"] || 'N/A'}`);
+});
+
 // Periodically check squawks every 5 minutes
 async function checkSquawks() {
   try {
     await maintStatus.getMaintStatus(settings); // Refresh maintenance status and squawks
     const diff = maintStatus.getSquawkDiff();
     if (diff.length > 0) {
+      let tails = [];
       console.log("New squawks detected:", diff);
       let message = "TailWinds Status\nNew squawks:\n";
       diff.forEach(sq => {
+        tails.push(sq.tailNumber || 'Unknown Aircraft');
         message += `- [${sq.tailNumber || 'Unknown Aircraft'}]: `;
         message += `- ${sq.description} `;
         if (sq.groundAircraft) {
@@ -80,9 +87,40 @@ async function checkSquawks() {
         message += `\n`;
       });
       // Here you can send a notification or handle the new squawks as needed
-      await sendNotification(settings, message);
+      await sendNotification(settings, message, tails);
     } else {
-      console.log("No new squawks detected.");
+      // console.log("No new squawks detected.");
+    }
+    const resolved = maintStatus.getResolvedSquawks();
+    if (resolved.length > 0) {
+      let tails = [];
+      console.log("Resolved squawks detected:", resolved);
+      let message = "TailWinds Status\nResolved squawks:\n";
+      resolved.forEach(sq => {
+        tails.push(sq.tailNumber || 'Unknown Aircraft');
+        message += `- [${sq.tailNumber || 'Unknown Aircraft'}]: `;
+        message += `- ${sq.description} `;
+        if (sq.groundAircraft) {
+          message += `was grounded`;
+        }
+        message += `\n`;
+      });
+      // Here you can send a notification or handle the new squawks as needed
+      await sendNotification(settings, message, tails);
+    } else {
+      // console.log("No resolved squawks detected.");
+    }
+    const groundingStatus = maintStatus.getAircraftGroundingStatus();
+    if (groundingStatus.length > 0) {
+      groundingStatus.forEach(ac => {
+        const oldAc = oldStatus.find(oac => oac.tailNumber === ac.tailNumber);
+        if (oldAc && oldAc.grounded !== undefined && oldAc.grounded !== ac.grounded) {
+          let message = `TailWinds Status\nAircraft ${ac.tailNumber} is now `;
+          message += ac.grounded ? "grounded." : "no longer grounded.";
+          sendNotification(settings, message, [ac.tailNumber]);
+        }
+      });
+      oldStatus = groundingStatus;
     }
   } catch (err) {
     console.error("Error in checkSquawks:", err);
@@ -146,7 +184,6 @@ app.get("/api/maint", async (req, res) => {
       res.json({ error: "No aircraft maintenance data available" });
       return;
     }
-    await updateAircraft(aircraft, settings);
     res.json(aircraft);
   } catch (err) {
     console.error("Error fetching aircraft maintenance status:", err);
@@ -167,7 +204,6 @@ app.get("/api/aircraft", async (req, res) => {
       res.json({ error: "No aircraft data available" });
       return;
     }
-    await updateAircraft(aircraft, settings);
     setAircraftCache(aircraft);
     res.json(aircraft);
   } catch (err) {
