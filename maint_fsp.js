@@ -19,7 +19,7 @@ async function fetchMaintData() {
 function renderMaintPage() {
   $(document.body).empty();
   const mainDiv = $("<div class='maint-main'>");
-  mainDiv.append($("<h1>").text("Aircraft Maintenance & Squawks"));
+  mainDiv.append($("<h1>").text("Daily Aircraft Maintenance & Squawks Report " + new Date().toLocaleDateString()));
   fetchMaintData().then(data => {
     if (!Array.isArray(data) || data.length === 0) {
       mainDiv.append($("<div>").text("No aircraft maintenance data available."));
@@ -44,7 +44,7 @@ function renderMaintPage() {
         const squawkList = $("<ul>");
         ac.squawks.forEach(sq => {
           const li = $("<li>");
-          li.text(sq.title || sq.description || JSON.stringify(sq));
+          li.text((sq.title || sq.description || JSON.stringify(sq)) + (sq.created ? ` (Created: ${new Date(sq.created).toLocaleDateString()})` : ""));
           if (sq.groundAircraft) {
             li.addClass("grounded");
           }
