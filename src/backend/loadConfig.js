@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-function loadConfig(configPath = path.join(__dirname, 'src', 'config.txt')) {
+function loadConfig(configPath = path.join(__dirname, '.', 'config.txt')) {
     const config = {};
     try {
         const content = fs.readFileSync(configPath, 'utf-8');

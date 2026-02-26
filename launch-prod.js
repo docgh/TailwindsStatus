@@ -5,7 +5,7 @@ const { spawn } = require('child_process');
 const path = require('path');
 
 // Start backend
-const backend = spawn('node', ['backend.js'], {
+const backend = spawn('node', ['src/backend/backend.js'], {
   cwd: __dirname,
   stdio: 'inherit',
   shell: true
