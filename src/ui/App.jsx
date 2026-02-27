@@ -5,7 +5,7 @@ import arrowImg from "./assets/arrow.png";
 import fromLeft from "./assets/frmLeft.png";
 import fromRight from "./assets/frmRight.png";
 import logo from "./assets/logo.png";
-import AircraftStatusDiv from "./AircraftStatusDiv";
+import AircraftStatusDiv, { AircraftStatusWithMapDiv } from "./AircraftStatusDiv";
 
 
 const isMobile = window.screen.width < 800;
@@ -191,7 +191,7 @@ function statusDiv(runways, allRed) {
 
 
 function setRunways(node, data) {
-    if (!data.weather.speed || !data.weather.dir) { // If weather data is not available, return an empty div
+    if (!data.weather.speed || !data.weather.dir || data.weather.speed === "00") { // If weather data is not available, return an empty div
     node.append($("<div>").addClass("runwayDiv").text("Winds calm"));
     return;
   }
@@ -352,9 +352,26 @@ function App() {
   let data;
   const mainDiv = $('<div class="main">');
   const node = $('<div class="runwaysDiv">');
+  const sunriseSunset = $('<div class="sunriseSunset">');
   async function getWeatherData() {
     data = await fetchWeatherData();
-    data.aircraft = await fetchAircraftData();
+    if (data.sunriseSunset) {
+      const riseSunset = {
+        sunrise: new Date(data.sunriseSunset.sunrise).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) || "N/A",
+        sunset: new Date(data.sunriseSunset.sunset).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) || "N/A"
+      }
+      sunriseSunset.empty();
+      sunriseSunset.append($("<img>").attr("src", "../assets/sunrise.png").addClass("sunriseIcon"));
+      sunriseSunset.append($("<span class='sunriseText'>").text(`Sunrise:`));
+      sunriseSunset.append(`${riseSunset.sunrise}`);
+      sunriseSunset.append($("<br>"));
+      sunriseSunset.append($("<img>").attr("src", "../assets/sunset.png").addClass("sunsetIcon"));  
+      sunriseSunset.append($("<span class='sunsetText'>").text(`Sunset:`));
+      sunriseSunset.append(`${riseSunset.sunset}`);
+    }
+    const aircraftResponse = await fetchAircraftData();
+    data.aircraft = aircraftResponse.aircraft || [];
+    data.aircraft_map = aircraftResponse.aircraft_map || null;
     const weatherStatusDiv = $('<div class="weatherStatus">');
     weatherStatusDiv.append(statusDiv(data.runways, data.allRed));
     weatherStatusDiv.append($('<div class="radarDiv">').append($('<img class="radar">').attr("src", data.weather.radar)))
@@ -368,7 +385,7 @@ function App() {
     const pageDiv = PagedDiv(pages);
     mainDiv.append(WeatherDiv(data.weather).append(pageDiv));
     mainDiv.append(weatherStatusDiv);
-    mainDiv.append(AircraftStatusDiv(data.aircraft || []));
+    mainDiv.append(AircraftStatusWithMapDiv(data.aircraft || [], data.aircraft_map));
     if (data.runways && data.runways.length > 0) {
       setRunways(node, data);
     }
@@ -385,7 +402,8 @@ function App() {
   );
   body.append(
     $('<div class="clock">')
-      .text(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))  
+      .text(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
+      .append(sunriseSunset)
   );
   body.append(mainDiv);
   body.append(clear());

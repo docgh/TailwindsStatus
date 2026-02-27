@@ -15,6 +15,8 @@ const { getRunwayData } = require("./analysis");
 const maintStatus = require("./maintStatus");
 const { sendNotification, handleSms, checkSmsEnabled } = require("./notification");
 const mysql = require("./mysql");
+const { drawPlaneMap } = require("./drawPlaneMap");
+const { getSunriseSunset } = require("./sunset");
 
 const app = express();
 const PORT = 5174;
@@ -201,11 +203,25 @@ app.get("/api/aircraft", async (req, res) => {
     }
     const aircraft = await aircraftStatus.getAircraftStatus(settings);
     if (!aircraft || aircraft.length === 0) {
-      res.json({ error: "No aircraft data available" });
+      res.json({ aircraft: [], aircraft_map: null });
       return;
     }
-    setAircraftCache(aircraft);
-    res.json(aircraft);
+    
+    let aircraftMap = null;
+    const aircraftInFlight = aircraft.filter(ac => ac.location && ac.location.includes('Lat:'));
+    if (aircraftInFlight.length > 0) {
+      console.log("Aircraft currently in flight:");
+      const mapBuffer = await drawPlaneMap(aircraftInFlight, settings);
+      aircraftMap = 'data:image/png;base64,' + mapBuffer.toString('base64');
+    }
+    
+    const response = {
+      aircraft: aircraft,
+      aircraft_map: aircraftMap
+    };
+    
+    setAircraftCache(response);
+    res.json(response);
   } catch (err) {
     console.error("Error fetching aircraft status:", err);
     res.status(500).json({ error: "Failed to fetch aircraft status" });
@@ -265,6 +281,7 @@ app.get("/api/weather", async (req, res) => {
     weather.radar = getRadarImg();
     const returnData = {};
     returnData.weather = weather;
+    returnData.sunriseSunset = getSunriseSunset(settings);
     returnData.runways = [];
     settings.runways.forEach((runway) => {
       const runwayData = getRunwayData({
@@ -306,3 +323,8 @@ app.post("/api/sms", express.urlencoded({ extended: false }), (req, res) => {
 app.listen(PORT, () => {
   console.log(`Backend API server running on http://localhost:${PORT}`);
 });
+
+module.exports = {
+  drawPlaneMap,
+  app
+};

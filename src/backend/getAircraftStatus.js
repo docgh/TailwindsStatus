@@ -47,6 +47,8 @@ async function getAircraftStatus(settings) {
         const icao24 = state[0];
         const ac = aircraft_status.find(ac => ac.icao24 === icao24);
         if (ac) {
+            ac.latitude = state[6];
+            ac.longitude = state[5];
             ac.location = `Lat: ${state[6]}, Lon: ${state[5]}`;
             ac.distance = getDistanceMiles(
                 settings.airport_lat, 

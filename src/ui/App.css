@@ -67,6 +67,25 @@
   box-shadow: 0 4px 16px rgba(0,0,0,0.12);
 }
 
+.sunriseSunset {
+  margin-top: 1rem;
+  font-size: 1.5rem;
+}
+.sunriseIcon, .sunsetIcon {
+  width: 30px;
+  padding-right: 10px;
+  padding-top:10px;
+  vertical-align: middle;
+  margin-bottom: 0.5em;
+} 
+
+.sunriseText, .sunsetText {
+  width: 90px;
+  display: inline-block;
+  text-align: left;
+  margin-right: 5px;
+}
+
 h1 {
   margin-bottom: 0.5em;
 }

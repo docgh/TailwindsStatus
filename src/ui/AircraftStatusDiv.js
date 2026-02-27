@@ -41,4 +41,63 @@ function AircraftStatusDiv(aircraftList) {
   return container;
 }
 
+/**
+ * Creates a wrapper div that cycles between AircraftStatusDiv and map image
+ * @param {Array<Object>} aircraftList - Array of aircraft objects
+ * @param {string} mapImageData - Optional base64 or URL of aircraft map image
+ * @returns {jQuery} - Wrapper div with cycling display
+ */
+function AircraftStatusWithMapDiv(aircraftList, mapImageData) {
+  const wrapperContainer = $('<div style="margin-top:55px;">').addClass('aircraftStatusWrapper');
+  
+  // Create the status div
+  const statusDiv = AircraftStatusDiv(aircraftList);
+  
+  // Create map div
+  const mapDiv = $('<div>').addClass('aircraftMapDiv').addClass('aircraftStatusDiv').css({
+    display: 'none',
+    textAlign: 'center'
+  });
+  
+  // Check if map image exists and is not empty
+  const hasMap = mapImageData && mapImageData.trim() !== '';
+  
+  if (hasMap) {
+    const mapImg = $('<img>')
+      .attr('src', mapImageData)
+      .css({
+        maxWidth: '100%',
+        maxHeight: '500px',
+        objectFit: 'contain'
+      });
+    mapDiv.append(mapImg);
+    
+    // Add cycling logic
+    let showingStatus = true;
+    const cycleDuration = 5000; // 5 seconds
+    
+    const cycleInterval = setInterval(() => {
+      if (showingStatus) {
+        statusDiv.hide();
+        mapDiv.show();
+        showingStatus = false;
+      } else {
+        mapDiv.hide();
+        statusDiv.show();
+        showingStatus = true;
+      }
+    }, cycleDuration);
+    
+    // Store interval ID on the wrapper for cleanup if needed
+    wrapperContainer.data('cycleInterval', cycleInterval);
+  }
+  
+  // Append both divs to wrapper
+  wrapperContainer.append(statusDiv);
+  wrapperContainer.append(mapDiv);
+  
+  return wrapperContainer;
+}
+
 export default AircraftStatusDiv;
+export { AircraftStatusWithMapDiv };
