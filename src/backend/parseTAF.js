@@ -47,9 +47,14 @@ function parseTAF(tafText, settings) {
   // First line: TAF KPNE 261720Z 2618/2718 ...
   const header = lines[0].split(' ');
   if (header[0] === 'TAF') {
-    result.station = header[1];
-    result.issued = header[2];
-    result.valid = header[3];
+    let i = 1;
+    // Handle possible "AMD" or "COR" after TAF
+    if (header[1] === 'AMD' || header[1] === 'COR') {
+      i++;
+    }
+    result.station = header[i++];
+    result.issued = header[i++];
+    result.valid = header[i++];
   }
 
   let tafRaw = lines[0];
