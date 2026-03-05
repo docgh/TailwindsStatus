@@ -92,7 +92,6 @@ async function getDump1090Location(settings) {
                 }
                 
                 // Successfully got valid data
-                console.log(`Successfully fetched dump1090 data from: ${url}`);
                 break;
             } catch (err) {
                 lastError = err.message;
@@ -123,7 +122,6 @@ async function getadsbfiLocation(settings) {
           if (adsbfiCache.data && adsbfiCache.timestamp) {
             const timeSinceCache = Date.now() - adsbfiCache.timestamp;
             if (timeSinceCache < adsbfiCacheTimeMs) {
-              console.log(`Using cached ADSB.fi data (${Math.round(timeSinceCache / 1000)}s old)`);
               applyData(adsbfiCache.data, aircraft_status, settings, 'adsbfi');
               return;
             }
@@ -154,7 +152,6 @@ async function getadsbfiLocation(settings) {
           // Successfully got valid data - cache it
           adsbfiCache.data = data;
           adsbfiCache.timestamp = Date.now();
-          console.log(`Successfully fetched adsbfi data from: ${baseUrl} (cached for 2s)`);
               if (!Array.isArray(data) || data.length === 0) {
               return;
           }
@@ -309,7 +306,6 @@ async function queryOpenSkyStates(icao24List, settings) {
   if (openSkyCache.data && openSkyCache.timestamp) {
     const timeSinceCache = Date.now() - openSkyCache.timestamp;
     if (timeSinceCache < cacheTimeMs) {
-      console.log(`Using cached OpenSky data (${Math.round(timeSinceCache / 1000)}s old, cache expires in ${Math.round((cacheTimeMs - timeSinceCache) / 1000)}s)`);
       return openSkyCache.data;
     }
   }
