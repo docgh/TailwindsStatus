@@ -45,7 +45,6 @@ async function fetchOSMTile(x, y, zoom) {
   
   // Check if tile is already in cache
   if (tileCache[cacheKey]) {
-    console.log(`Using cached tile: ${cacheKey}`);
     return tileCache[cacheKey];
   }
   
@@ -156,8 +155,8 @@ function drawPlaneIcon(ctx, x, y, bearing, color = '#FF0000') {
  * @returns {Promise<Buffer>} - PNG image buffer
  */
 async function drawPlaneMap(planes, settings, options = {}) {
-  const width = options.width || 350;
-  const height = options.height || 350;
+  const width = options.width || 400;
+  const height = options.height || 400;
   const radiusNM = options.radiusNM || 25; // 25 nautical mile radius by default
   const radiusMiles = radiusNM * 1.15078; // Convert nautical miles to statute miles
 
@@ -282,7 +281,7 @@ async function drawPlaneMap(planes, settings, options = {}) {
           planePos.y < height + 50
         ) {
           // Calculate bearing from airport to plane
-          const bearing = getBearing(centerLat, centerLon, plane.latitude, plane.longitude);
+          //const bearing = getBearing(centerLat, centerLon, plane.latitude, plane.longitude);
           
           // Determine color based on aircraft status
           let color = '#FF0000'; // Default red
@@ -297,7 +296,7 @@ async function drawPlaneMap(planes, settings, options = {}) {
           }
 
           // Draw plane icon with bearing
-          drawPlaneIcon(ctx, planePos.x, planePos.y, bearing, color);
+          drawPlaneIcon(ctx, planePos.x, planePos.y, plane.bearing, color);
 
           // Draw plane label with background
           const planeName = plane.name || 'Unknown';

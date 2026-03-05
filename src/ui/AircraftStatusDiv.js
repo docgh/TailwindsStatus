@@ -17,7 +17,7 @@ function AircraftStatusDiv(aircraftList) {
     const item = $('<li>').addClass('aircraftItem');
     item.append($('<span>').addClass('aircraftName').css({ fontWeight: 'bold', marginRight: '1em' }).text(ac.name || 'Unknown'));
     let location = ac.location ? `${ac.location}` : 'Location: Unknown';
-    const locationSpan = $('<span>').addClass('aircraftLocation');
+    const locationSpan = $('<span id="' + ac.icao24 + '">').addClass('aircraftLocation');
     if (ac.distance && ac.altitude) {
       location = `Dist: ${ac.distance}, Alt: ${ac.altitude} ft`;
     } else { // If not in air, show if checked out, grounded, or in maintenance
@@ -77,7 +77,8 @@ function AircraftStatusWithMapDiv(aircraftList, mapImageData) {
     const cycleDuration = 5000; // 5 seconds
     
     const cycleInterval = setInterval(() => {
-      if (showingStatus) {
+      // if showingStatus is true, and mapDiv attr disabled is not true, then show mapDiv and hide statusDiv, else do the opposite
+      if (showingStatus && mapDiv.attr("disabled") !== "disabled") {
         statusDiv.hide();
         mapDiv.show();
         showingStatus = false;

@@ -5,10 +5,18 @@ import arrowImg from "./assets/arrow.png";
 import fromLeft from "./assets/frmLeft.png";
 import fromRight from "./assets/frmRight.png";
 import logo from "./assets/logo.png";
+import { useEffect } from "react";
 import AircraftStatusDiv, { AircraftStatusWithMapDiv } from "./AircraftStatusDiv";
 
 
 const isMobile = window.screen.width < 800;
+
+let timer = 0;
+
+let checking = false;
+let loaded = false;
+// Guard to ensure initial weather fetch only runs once (survives StrictMode remounts)
+let weatherDataFetched = false;
 
 function setZoom() {
   if (window.matchMedia('(min-width: 300px) and (max-width: 1600px)').matches) {
@@ -348,7 +356,6 @@ function App() {
     screensaver();
     return;
   }
-
   let data;
   const mainDiv = $('<div class="main">');
   const node = $('<div class="runwaysDiv">');
@@ -389,11 +396,44 @@ function App() {
     if (data.runways && data.runways.length > 0) {
       setRunways(node, data);
     }
-     // Reload the page every 5 minutes (300,000 ms)
+    // Reload the page every 5 minutes (300,000 ms)
     const freq = data.update_frequency || 5; // Use update_frequency from data or default to 5 minutes
     setTimeout(() => {
       window.location.reload();
     }, freq * 60 * 1000);
+
+    if (data.aircraft_map && data.aircraft_map.trim() !== "") {
+        if (timer !== 0) { clearTimeout(timer); }
+        // Query the api/map endpoint 10 seconds for updated map data, and if present, update the map image without reloading the page
+        setInterval(async () => {
+          try {
+            if (checking) return; // Prevent overlapping checks if one takes too long
+            checking = true;
+            const response = await fetch(getURL("update"));
+            if (response.ok) {
+              const mapData = await response.json();
+              if (mapData && mapData.aircraft_map && mapData.aircraft_map.length > 100) {
+                $('.aircraftMapDiv img').attr("src", mapData.aircraft_map);
+                $('.aircraftMapDiv').removeAttr("disabled");
+              } else {
+                $('.aircraftMapDiv').attr("disabled", "true");
+              }
+              if (mapData && mapData.aircraft) {
+                mapData.aircraft.forEach(ac => {
+                  if (ac.distance) {
+                    $(`#${ac.icao24}`).text(`Dist: ${ac.distance}, Alt: ${ac.altitude} ft`);
+                  } else {
+                    $(`#${ac.icao24}`).text(ac.location || "Location: Unknown");
+                  }
+                });
+              }
+            }
+          } catch (error) {
+            console.error("Error fetching map data:", error);
+          }
+          checking = false;
+        }, 10000);
+    }
   }
   const body = $('<div class="weather-main">');
   body.append(
@@ -409,20 +449,22 @@ function App() {
   body.append(clear());
   body.append("<hr>");
   body.append(node);
-  $(document.body).empty(); // Clear the body before appending new content
-  $(document.body).append(body);
-  getWeatherData();
+  useEffect(() => {
+    if (weatherDataFetched) return;
+    weatherDataFetched = true;
+    // Render static DOM and then fetch/update dynamic data
+    $(document.body).empty(); // Clear the body before appending new content
+    $(document.body).append(body);
+    getWeatherData();
+  }, []);
 
-  // Reload the page every 5 minutes (300,000 ms)
-  setTimeout(() => {
-    window.location.reload();
-  }, 300000);
 
   // Reload on mobile orientation change
+  /** 
   window.addEventListener("orientationchange", () => {
     window.location.reload();
   });
-
+  */
   return;
 }
 

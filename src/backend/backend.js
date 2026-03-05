@@ -17,14 +17,13 @@ const { sendNotification, handleSms, checkSmsEnabled } = require("./notification
 const mysql = require("./mysql");
 const { drawPlaneMap } = require("./drawPlaneMap");
 const { getSunriseSunset } = require("./sunset");
+const { updateAircraft } = require("./Fsp");
 
 const app = express();
 const PORT = 5174;
 
 let cacheData = null;
-let aircraftCacheData = null;
 let cacheTimestamp = 0;
-let aircraftCacheTimestamp = 0;
 let oldStatus = [];
 
 function setCache(data) {
@@ -43,21 +42,6 @@ function getCache() {
   return null;
 }
 
-function getAircraftCache() {
-if (
-    aircraftCacheData &&
-    Date.now() - aircraftCacheTimestamp <
-      (settings.cache_duration_minutes || settings.update_frequency || 5) * 60 * 1000
-  ) {
-    return aircraftCacheData;
-  }
-  return null;
-}
-
-function setAircraftCache(data) {
-  aircraftCacheData = data;
-  aircraftCacheTimestamp = Date.now();
-}
 
 app.use(cors());
 
@@ -193,24 +177,37 @@ app.get("/api/maint", async (req, res) => {
   }
 });
 
+app.get("/api/update", async (req, res) => {
+    let aircraft = await aircraftStatus.getAircraftLocation(settings);
+    let aircraftMap = null;
+    const aircraftInFlight = aircraft.filter(ac => ac.location && ac.location.includes('Lat:') && isWithinDistance(ac));
+    if (aircraftInFlight.length > 0) {
+      const mapBuffer = await drawPlaneMap(aircraftInFlight, settings);
+      aircraftMap = 'data:image/png;base64,' + mapBuffer.toString('base64');
+    }
+    const response = {
+      aircraft: aircraft,
+      aircraft_map: aircraftMap
+    };
+    res.json(response);
+});
+
+function isWithinDistance(ac) {
+  return ac.distance && (parseInt(ac.distance) < 30);
+}
 
 app.get("/api/aircraft", async (req, res) => {
   try {
-    const cached = getAircraftCache();
-    if (cached) {
-      res.json(cached);
-      return;
-    }
-    const aircraft = await aircraftStatus.getAircraftStatus(settings);
+    let aircraft = await aircraftStatus.getAircraftLocation(settings);
+    aircraft = await updateAircraft(aircraft, settings);
     if (!aircraft || aircraft.length === 0) {
       res.json({ aircraft: [], aircraft_map: null });
       return;
     }
     
     let aircraftMap = null;
-    const aircraftInFlight = aircraft.filter(ac => ac.location && ac.location.includes('Lat:'));
+    const aircraftInFlight = aircraft.filter(ac => ac.location && ac.location.includes('Lat:') && isWithinDistance(ac));
     if (aircraftInFlight.length > 0) {
-      console.log("Aircraft currently in flight:");
       const mapBuffer = await drawPlaneMap(aircraftInFlight, settings);
       aircraftMap = 'data:image/png;base64,' + mapBuffer.toString('base64');
     }
@@ -220,7 +217,6 @@ app.get("/api/aircraft", async (req, res) => {
       aircraft_map: aircraftMap
     };
     
-    setAircraftCache(response);
     res.json(response);
   } catch (err) {
     console.error("Error fetching aircraft status:", err);
@@ -269,6 +265,8 @@ app.get("/api/weather", async (req, res) => {
     const data = await response.text();
     const lines = data.split("\n").filter((line) => line.trim());
     if (lines.length === 0) { // No valid METAR data
+      console.error("No valid METAR data received");
+      console.error("Response data:", data);
       res.status(500).json({ error: "No valid METAR data received" });
       return;
     }
