@@ -4,6 +4,9 @@ const fetch = require("node-fetch").default;
 
 let oauthToken = null;
 let aircraft_status = null;
+let openSkyDisabled = false;
+let adsbfiDisabled = false;
+let dump1090Disabled = false;
 let openSkyCache = {
     data: null,
     timestamp: null
@@ -18,7 +21,7 @@ async function getAircraftLocation(settings) {
   return await getAircraftLocations(settings, true);
 }
 
-async function getAircraftLocations(settings) {
+async function getAircraftLocations(settings, useCache = false) {
 
     if (aircraft_status === null) {
       aircraft_status = settings.aircraft.map(ac => {
@@ -32,7 +35,7 @@ async function getAircraftLocations(settings) {
     if (aircraft_status.length === 0) {
         return [];
     }
-    cleanAircraftStatus();
+    cleanAircraftStatus(useCache);
     await getOpenSkyLocation(settings);
     await getadsbfiLocation(settings);
     await getDump1090Location(settings);
@@ -40,9 +43,9 @@ async function getAircraftLocations(settings) {
 }
 
 // Resets location data for any aircraft that hasn't been updated in the last minute, assuming they have likely landed or are no longer trackable
-function cleanAircraftStatus() {
+function cleanAircraftStatus(useCache) {
     aircraft_status.map(ac => {
-        if (ac.lastUpdate && ac.lastUpdate < new Date(Date.now() - 60 * 1000)) {
+        if (!useCache || (ac.lastUpdate && ac.lastUpdate < new Date(Date.now() - 60 * 1000))) {
             ac.latitude = null;
             ac.longitude = null;
             ac.location = "Landed";
@@ -55,6 +58,9 @@ function cleanAircraftStatus() {
 
 async function getDump1090Location(settings) {
     try {
+        if (dump1090Disabled) {
+            return;
+        }
         // Parse dump1090_url which can be a single URL or comma-separated URLs
         let urls = [];
         if (settings.dump1090_url) {
@@ -65,6 +71,7 @@ async function getDump1090Location(settings) {
         }
         
         if (urls.length === 0) {
+          dump1090Disabled = true;
             console.warn("No dump1090 URLs configured");
             return;
         }
@@ -111,7 +118,11 @@ async function getDump1090Location(settings) {
 }
 
 async function getadsbfiLocation(settings) {
+  if (adsbfiDisabled) { 
+    return;
+  }
   if (!settings.useadsbfi) { // Check if adsbfi_url is configured
+    adsbfiDisabled = true;
     console.warn("ADSB.fi not enabled, skipping ADSB.fi data retrieval");
     return;
   }
@@ -122,6 +133,7 @@ async function getadsbfiLocation(settings) {
           if (adsbfiCache.data && adsbfiCache.timestamp) {
             const timeSinceCache = Date.now() - adsbfiCache.timestamp;
             if (timeSinceCache < adsbfiCacheTimeMs) {
+              console.log(`Using cached ADSB.fi data (cached ${Math.round(timeSinceCache / 1000)} seconds ago)`);
               applyData(adsbfiCache.data, aircraft_status, settings, 'adsbfi');
               return;
             }
@@ -195,8 +207,12 @@ function applyData(data, aircraft_status, settings, source) {
 }
 
 async function getOpenSkyLocation(settings) {
+      if(openSkyDisabled) {
+        return;
+      }
       if (!settings.opensky_token_url || !settings.opensky_client_id || !settings.opensky_client_secret) {
         console.warn("OpenSky API credentials not fully configured, skipping OpenSky data retrieval");
+        openSkyDisabled = true;
         return;
     }
       if (oauthToken === null) {

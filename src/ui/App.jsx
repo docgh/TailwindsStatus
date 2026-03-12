@@ -1,4 +1,4 @@
-import $, { data } from "jquery";
+import $, { data, get } from "jquery";
 import "./App.css";
 import runwayImg from "./assets/runway.png";
 import arrowImg from "./assets/arrow.png";
@@ -6,12 +6,16 @@ import fromLeft from "./assets/frmLeft.png";
 import fromRight from "./assets/frmRight.png";
 import logo from "./assets/logo.png";
 import { useEffect } from "react";
-import AircraftStatusDiv, { AircraftStatusWithMapDiv } from "./AircraftStatusDiv";
+import { AircraftStatusWithMapDiv } from "./AircraftStatusDiv";
+import debounceAsync from "./debounceAsync";
 
 
 const isMobile = window.screen.width < 800;
+const updateFrequency = 5 * 60 * 1000; // 5 minutes
+const reloadFrequency = 60 * 60 * 1000; // 1 hour
 
 let timer = 0;
+let updateTimer = 0;
 
 let checking = false;
 let loaded = false;
@@ -47,10 +51,12 @@ async function fetchWeatherData() {
 
 async function fetchAircraftData() {
   const response = await fetch(getURL("aircraft"));
-  //const response = await fetch("./api/aircraft");
   if (!response.ok) throw new Error("Failed to fetch aircraft data");
   return response.json();
 }
+
+const debouncedFetchAircraftData = debounceAsync(fetchAircraftData, 500);
+const debouncedFetchWeatherData = debounceAsync(fetchWeatherData, 500);
 
 function getImage(crosswind) {
   if (crosswind === 0) {
@@ -361,8 +367,9 @@ function App() {
   const node = $('<div class="runwaysDiv">');
   const sunriseSunset = $('<div class="sunriseSunset">');
   async function getWeatherData() {
-    data = await fetchWeatherData();
-    if (data.sunriseSunset) {
+    data = await debouncedFetchWeatherData();
+    if (data.sunriseSunset && !isMobile) {
+      sunriseSunset.empty();
       const riseSunset = {
         sunrise: new Date(data.sunriseSunset.sunrise).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) || "N/A",
         sunset: new Date(data.sunriseSunset.sunset).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) || "N/A"
@@ -376,7 +383,17 @@ function App() {
       sunriseSunset.append($("<span class='sunsetText'>").text(`Sunset:`));
       sunriseSunset.append(`${riseSunset.sunset}`);
     }
-    const aircraftResponse = await fetchAircraftData();
+    $(".clock").empty().text(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
+      .append(sunriseSunset);
+    if (isMobile) {
+    $(".clock").css({
+      border: "none",
+      background: "none"
+      });
+    }
+    const aircraftResponse = await debouncedFetchAircraftData();
+    mainDiv.empty();
+    node.empty();
     data.aircraft = aircraftResponse.aircraft || [];
     data.aircraft_map = aircraftResponse.aircraft_map || null;
     const weatherStatusDiv = $('<div class="weatherStatus">');
@@ -396,16 +413,10 @@ function App() {
     if (data.runways && data.runways.length > 0) {
       setRunways(node, data);
     }
-    // Reload the page every 5 minutes (300,000 ms)
-    const freq = data.update_frequency || 5; // Use update_frequency from data or default to 5 minutes
-    setTimeout(() => {
-      window.location.reload();
-    }, freq * 60 * 1000);
-
+    if (updateTimer !== 0) { clearTimeout(updateTimer); }
     if (data.aircraft_map && data.aircraft_map.trim() !== "") {
-        if (timer !== 0) { clearTimeout(timer); }
         // Query the api/map endpoint 10 seconds for updated map data, and if present, update the map image without reloading the page
-        setInterval(async () => {
+        updateTimer = setInterval(async () => {
           try {
             if (checking) return; // Prevent overlapping checks if one takes too long
             checking = true;
@@ -442,13 +453,22 @@ function App() {
   );
   body.append(
     $('<div class="clock">')
-      .text(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
-      .append(sunriseSunset)
   );
   body.append(mainDiv);
   body.append(clear());
-  body.append("<hr>");
+  body.append("<hr style='margin-top: -60px;'>");
   body.append(node);
+
+  // Use updatefrequency for refresh of weather and aircraft data, and reloadFrequency for full page reload to mitigate any potential memory leaks or performance degradation over time
+  setInterval(() => {
+    if (updateTimer !== 0) { clearTimeout(updateTimer); }
+    getWeatherData();
+  }, updateFrequency);
+ 
+  setTimeout(() => {
+    window.location.reload();
+  }, reloadFrequency);
+
   useEffect(() => {
     if (weatherDataFetched) return;
     weatherDataFetched = true;
@@ -460,11 +480,11 @@ function App() {
 
 
   // Reload on mobile orientation change
-  /** 
+
   window.addEventListener("orientationchange", () => {
     window.location.reload();
   });
-  */
+
   return;
 }
 

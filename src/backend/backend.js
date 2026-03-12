@@ -178,7 +178,7 @@ app.get("/api/maint", async (req, res) => {
 });
 
 app.get("/api/update", async (req, res) => {
-    let aircraft = await aircraftStatus.getAircraftLocation(settings);
+    let aircraft = await aircraftStatus.getAircraftLocation(settings, true);  // use cache, as we are not re-pulling FSP
     let aircraftMap = null;
     const aircraftInFlight = aircraft.filter(ac => ac.location && ac.location.includes('Lat:') && isWithinDistance(ac));
     if (aircraftInFlight.length > 0) {
@@ -301,7 +301,6 @@ app.get("/api/weather", async (req, res) => {
     returnData.allRed = checkAllRed(weather);
     returnData.update_frequency = settings.update_frequency || 5; // Default to 5 minutes if not set
     setCache(returnData);
-    console.log("Returned: ", JSON.stringify(returnData));
     res.json(returnData);
   } catch (err) {
     console.error("Error fetching weather data:", err);

@@ -163,7 +163,7 @@ p {
   align-items: center;
   width: 100%;
   position: relative;
-  top: -80px;
+  top: -100px;
 }
 
 .main .statusBoxesContainer {
@@ -219,5 +219,5 @@ p {
 
 .aircraftLocation {
   display: inline-block;
-  width: 230px;
+  width: 250px;
 }
