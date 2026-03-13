@@ -71,16 +71,16 @@ async function fetchOSMTile(x, y, zoom) {
 }
 
 /**
- * Calculate distance between two lat/lon points in miles
+ * Calculate distance between two lat/lon points in nautical miles
  * @param {number} lat1 - Starting latitude
  * @param {number} lon1 - Starting longitude
  * @param {number} lat2 - Ending latitude
  * @param {number} lon2 - Ending longitude
- * @returns {number} - Distance in miles
+ * @returns {number} - Distance in nautical miles
  */
 function getDistanceMiles(lat1, lon1, lat2, lon2) {
   const toRad = deg => deg * Math.PI / 180;
-  const R = 3958.8; // Radius of Earth in miles
+  const R = 3440.065; // Radius of Earth in nautical miles
   const dLat = toRad(lat2 - lat1);
   const dLon = toRad(lon2 - lon1);
   const a =
@@ -157,17 +157,37 @@ function drawPlaneIcon(ctx, x, y, bearing, color = '#FF0000') {
 async function drawPlaneMap(planes, settings, options = {}) {
   const width = options.width || 400;
   const height = options.height || 400;
-  const radiusNM = options.radiusNM || 25; // 25 nautical mile radius by default
-  const radiusMiles = radiusNM * 1.15078; // Convert nautical miles to statute miles
 
   const centerLat = settings.airport_lat;
   const centerLon = settings.airport_lon;
 
+  // Find the furthest aircraft from the airport, then make the map radius 2× that distance
+  const maxDistanceNM = Array.isArray(planes)
+    ? planes.reduce((max, plane) => {
+        if (plane.latitude && plane.longitude) {
+          return Math.max(max, getDistanceMiles(centerLat, centerLon, plane.latitude, plane.longitude));
+        }
+        return max;
+      }, 0)
+    : 0;
+
+  let radiusNM;
+  if (maxDistanceNM > 0) {
+    radiusNM = Math.round(Math.max(2, Math.min(maxDistanceNM, settings.filter_plane_distance_miles || 50)));
+  } else {
+    radiusNM = options.radiusNM || settings.filter_plane_distance_miles || 25;
+  }
+
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext('2d');
 
-  // Use zoom level 12 for good balance between detail and area coverage
-  const zoom = 12;
+  // Adjust zoom based on map radius so larger radii zoom out and smaller radii zoom in.
+  const mapDiameterMeters = radiusNM * 2 * 1852;
+  const targetPixelSpan = Math.max(1, Math.min(width, height) * 0.8);
+  const metersPerPixel = mapDiameterMeters / targetPixelSpan;
+  const cosLat = Math.max(Math.cos((centerLat * Math.PI) / 180), 0.01);
+  const zoomRaw = Math.log2((156543.03392 * cosLat) / metersPerPixel);
+  const zoom = Math.max(7, Math.min(15, Math.floor(zoomRaw)));
   
   // Get center tile coordinates
   const centerTile = latLonToTile(centerLat, centerLon, zoom);
@@ -228,8 +248,8 @@ async function drawPlaneMap(planes, settings, options = {}) {
   ctx.lineWidth = 2;
   ctx.strokeRect(1, 1, width - 2, height - 2);
 
-  // Calculate pixels per mile
-  const pixelsPerMile = (width / 2) / radiusMiles;
+  // Calculate pixels per nautical mile
+  const pixelsPerNM = (width / 2) / radiusNM / 2;
 
   // Helper function to convert lat/lon to canvas coordinates
   function latLonToCanvas(lat, lon) {
@@ -237,8 +257,8 @@ async function drawPlaneMap(planes, settings, options = {}) {
     const deltaLon = lon - centerLon;
     
     // Simple projection (works well for small areas)
-    const x = width / 2 + deltaLon * pixelsPerMile * Math.cos((centerLat * Math.PI) / 180) * 69;
-    const y = height / 2 - deltaLat * pixelsPerMile * 69;
+    const x = width / 2 + deltaLon * pixelsPerNM * Math.cos((centerLat * Math.PI) / 180) * 60;
+    const y = height / 2 - deltaLat * pixelsPerNM * 60;
     
     return { x, y };
   }
@@ -299,7 +319,10 @@ async function drawPlaneMap(planes, settings, options = {}) {
           drawPlaneIcon(ctx, planePos.x, planePos.y, plane.bearing, color);
 
           // Draw plane label with background
-          const planeName = plane.name || 'Unknown';
+          let planeName = plane.name || 'Unknown';
+          if (plane.altitude) {
+            planeName += `\n(${plane.altitude} ft)`;
+          }
           ctx.font = '9px Arial';
           ctx.textAlign = 'center';
           const nameMetrics = ctx.measureText(planeName);
@@ -320,7 +343,8 @@ async function drawPlaneMap(planes, settings, options = {}) {
   ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
   ctx.font = '8px Arial';
   ctx.textAlign = 'center';
-  const scaleText = `${radiusNM}nm radius`;
+  const scale = radiusNM * 2;
+  const scaleText = `${scale}nm radius`;
   const scaleMetrics = ctx.measureText(scaleText);
   ctx.fillRect(width / 2 - scaleMetrics.width / 2 - 2, height - 18, scaleMetrics.width + 4, 12);
   ctx.strokeStyle = '#333333';
