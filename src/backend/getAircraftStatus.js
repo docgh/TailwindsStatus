@@ -52,6 +52,8 @@ function cleanAircraftStatus(useCache) {
             ac.distance = null;
             ac.altitude = null;
             ac.lastUpdate = null;
+            ac.maintenance = false;
+            ac.checkedOut = false;
         }
     });
 }
@@ -199,7 +201,7 @@ function applyData(data, aircraft_status, settings, source) {
                     settings.airport_lon,
                     ac.lat,
                     ac.lon
-                ).toFixed(2) + " mi";
+                ).toFixed(2) + " nm";
             }
 
         }
@@ -257,7 +259,7 @@ async function getOpenSkyLocation(settings) {
                 settings.airport_lon, 
                 state[6], 
                 state[5]
-            ).toFixed(2) + " mi";
+            ).toFixed(2) + " nm";
             ac.altitude = metersToFeet(state[7]);
             ac.bearing = state[10];
             ac.velocity = state[9];
@@ -354,16 +356,16 @@ async function queryOpenSkyStates(icao24List, settings) {
 }
 
 /**
- * Calculate the distance in miles between two latitude/longitude points using the Haversine formula
+ * Calculate the distance in nautical miles between two latitude/longitude points using the Haversine formula
  * @param {number} lat1 - Latitude of first point
  * @param {number} lon1 - Longitude of first point
  * @param {number} lat2 - Latitude of second point
  * @param {number} lon2 - Longitude of second point
- * @returns {number} - Distance in miles
+ * @returns {number} - Distance in nautical miles
  */
 function getDistanceMiles(lat1, lon1, lat2, lon2) {
   const toRad = deg => deg * Math.PI / 180;
-  const R = 3958.8; // Radius of Earth in miles
+  const R = 3440.065; // Radius of Earth in nautical miles
   const dLat = toRad(lat2 - lat1);
   const dLon = toRad(lon2 - lon1);
   const a =
