@@ -18,29 +18,14 @@ const mysql = require("./mysql");
 const { drawPlaneMap } = require("./drawPlaneMap");
 const { getSunriseSunset } = require("./sunset");
 const { updateAircraft } = require("./Fsp");
+const { setCache, getCache } = require('./cache');
+
 
 const app = express();
 const PORT = 5174;
 
-let cacheData = null;
-let cacheTimestamp = 0;
 let oldStatus = [];
 
-function setCache(data) {
-  cacheData = data;
-  cacheTimestamp = Date.now();
-}
-
-function getCache() {
-  if (
-    cacheData &&
-    Date.now() - cacheTimestamp <
-      (settings.cache_duration_minutes || settings.update_frequency || 5) * 60 * 1000
-  ) {
-    return cacheData;
-  }
-  return null;
-}
 
 
 app.use(cors());
@@ -164,6 +149,11 @@ function checkAllRed(weather) {
 
 app.get("/api/maint", async (req, res) => {
   try {
+    const cache = getCache('maint');
+    if (cache) {
+      res.json(cache);
+      return;
+    }
     await checkSquawks(); // Ensure squawks are checked before fetching maintenance status
     const aircraft = await maintStatus.getMaintStatus(settings);
     if (!aircraft || aircraft.length === 0) {
@@ -171,6 +161,7 @@ app.get("/api/maint", async (req, res) => {
       return;
     }
     res.json(aircraft);
+    setCache('maint', aircraft, 5 * 60 * 1000); // Cache for 5 minutes
   } catch (err) {
     console.error("Error fetching aircraft maintenance status:", err);
     res.status(500).json({ error: "Failed to fetch aircraft maintenance status" });
@@ -178,6 +169,11 @@ app.get("/api/maint", async (req, res) => {
 });
 
 app.get("/api/update", async (req, res) => {
+    const cache = getCache('update');
+    if (cache) {
+      res.json(cache);
+      return;
+    }
     let aircraft = await aircraftStatus.getAircraftLocation(settings, true);  // use cache, as we are not re-pulling FSP
     let aircraftMap = null;
     const aircraftInFlight = aircraft.filter(ac => ac.location && ac.location.includes('Lat:') && isWithinDistance(ac));
@@ -190,14 +186,20 @@ app.get("/api/update", async (req, res) => {
       aircraft_map: aircraftMap
     };
     res.json(response);
+    setCache('update', response, 2000); // Cache for 2 seconds to prevent rapid repeated calls
 });
 
 function isWithinDistance(ac) {
-  return ac.distance && (parseInt(ac.distance) < 30);
+  return ac.distance && (parseInt(ac.distance) < settings.filter_plane_distance_miles);
 }
 
 app.get("/api/aircraft", async (req, res) => {
   try {
+    const cached = getCache('aircraft');
+    if (cached) {
+      res.json(cached);
+      return;
+    }
     let aircraft = await aircraftStatus.getAircraftLocation(settings);
     aircraft = await updateAircraft(aircraft, settings);
     if (!aircraft || aircraft.length === 0) {
@@ -218,6 +220,7 @@ app.get("/api/aircraft", async (req, res) => {
     };
     
     res.json(response);
+    setCache('aircraft', response, 60 * 1000); // Cache for 1 minute
   } catch (err) {
     console.error("Error fetching aircraft status:", err);
     res.status(500).json({ error: "Failed to fetch aircraft status" });
@@ -251,7 +254,7 @@ async function getNearby(weatherdata) {
 
 app.get("/api/weather", async (req, res) => {
   try {
-    const cached = getCache();
+    const cached = getCache('weather');
     if (cached) {
       res.json(cached);
       return;
@@ -300,7 +303,7 @@ app.get("/api/weather", async (req, res) => {
     returnData.runways.sort((a, b) => b.headwind - a.headwind);
     returnData.allRed = checkAllRed(weather);
     returnData.update_frequency = settings.update_frequency || 5; // Default to 5 minutes if not set
-    setCache(returnData);
+    setCache('weather', returnData, (settings.cache_duration_minutes || settings.update_frequency || 5) * 60 * 1000);
     res.json(returnData);
   } catch (err) {
     console.error("Error fetching weather data:", err);
