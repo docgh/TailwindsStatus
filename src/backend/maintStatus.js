@@ -1,5 +1,3 @@
-const e = require("cors");
-
 const fetch = require("node-fetch").default;
 
 let maintCache = null;
@@ -8,9 +6,6 @@ let lastSquawk = null;
 let resolvedSquawks = [];
 let squawkDiff = null;
 let aircraftList = null;
-
-let prior = [];
-let test = false;
 
 function getCache() {
   const now = Date.now();

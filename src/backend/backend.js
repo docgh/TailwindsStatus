@@ -4,8 +4,6 @@
 const fetch = require("node-fetch").default;
 const cors = require("cors");
 const express = require("express");
-const fs = require("fs");
-const { expr, get } = require("jquery");
 const path = require("path");
 const loadConfig = require("./loadConfig");
 const parseMetar = require('./parseMetar');
@@ -14,7 +12,6 @@ const aircraftStatus = require('./getAircraftStatus');
 const { getRunwayData } = require("./analysis");
 const maintStatus = require("./maintStatus");
 const { sendNotification, handleSms, checkSmsEnabled } = require("./notification");
-const mysql = require("./mysql");
 const { drawPlaneMap } = require("./drawPlaneMap");
 const { getSunriseSunset } = require("./sunset");
 const { updateAircraft } = require("./Fsp");
@@ -311,7 +308,7 @@ app.get("/api/weather", async (req, res) => {
   }
 });
 
-app.use(express.static(path.join(__dirname, "dist"), { extensions: ['html', 'htm'] }));
+app.use(express.static(path.join("/app", "dist"), { extensions: ['html', 'htm'] }));
 
 // Check if SMS is enabled at startup
 checkSmsEnabled(settings);

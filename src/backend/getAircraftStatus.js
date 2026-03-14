@@ -1,5 +1,3 @@
-const { cache } = require("react");
-
 const fetch = require("node-fetch").default;
 
 let oauthToken = null;
@@ -120,6 +118,7 @@ async function getDump1090Location(settings) {
 }
 
 async function getadsbfiLocation(settings) {
+  let lastError = null;
   if (adsbfiDisabled) { 
     return;
   }
@@ -143,10 +142,8 @@ async function getadsbfiLocation(settings) {
 
           // Try each URL until we get valid data
           let data = null;
-          let lastError = null;
           
           let baseUrl = 'https://opendata.adsb.fi/api/v2/icao/';
-          const params = new URLSearchParams();
           const icao24List = getIcao24List(settings);
           if (Array.isArray(icao24List) && icao24List.length > 0) {
              //params.append('icao24', icao24List.join(','));

@@ -2,7 +2,6 @@
 // Launches both backend and frontend (production build) for TailwindsStatus
 
 const { spawn } = require('child_process');
-const path = require('path');
 
 // Start backend
 const backend = spawn('node', ['src/backend/backend.js'], {

@@ -4,7 +4,6 @@
 const { sendEmailNotification } = require('./emailNotification');
 const twilio = require('twilio');
 const mysql = require('./mysql'); // Import MySQL functions
-const { send } = require('vite');
 
 let sms_enabled = false;
 
