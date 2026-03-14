@@ -375,11 +375,11 @@ function App() {
         sunset: new Date(data.sunriseSunset.sunset).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) || "N/A"
       }
       sunriseSunset.empty();
-      sunriseSunset.append($("<img>").attr("src", "../assets/sunrise.png").addClass("sunriseIcon"));
+      sunriseSunset.append($("<img>").attr("src", "./assets/sunrise.png").addClass("sunriseIcon"));
       sunriseSunset.append($("<span class='sunriseText'>").text(`Sunrise:`));
       sunriseSunset.append(`${riseSunset.sunrise}`);
       sunriseSunset.append($("<br>"));
-      sunriseSunset.append($("<img>").attr("src", "../assets/sunset.png").addClass("sunsetIcon"));  
+      sunriseSunset.append($("<img>").attr("src", "./assets/sunset.png").addClass("sunsetIcon"));  
       sunriseSunset.append($("<span class='sunsetText'>").text(`Sunset:`));
       sunriseSunset.append(`${riseSunset.sunset}`);
     }
