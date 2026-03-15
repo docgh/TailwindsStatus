@@ -333,6 +333,22 @@ async function drawPlaneMap(planes, settings, options = {}) {
           ctx.strokeRect(planePos.x - nameMetrics.width / 2 - 2, planePos.y + 16, nameMetrics.width + 4, 11);
           ctx.fillStyle = '#000000';
           ctx.fillText(planeName, planePos.x, planePos.y + 25);
+
+          // Draw plane history if available as a faint trail
+          if (Array.isArray(plane.history)) {
+            ctx.strokeStyle = 'rgba(0, 0, 255, 0.5)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            plane.history.forEach((point, index) => {
+              const histPos = latLonToCanvas(point.latitude, point.longitude);
+              if (index === 0) {
+                ctx.moveTo(histPos.x, histPos.y);
+              } else {
+                ctx.lineTo(histPos.x, histPos.y);
+              }
+            });
+            ctx.stroke();
+          }
         }
       }
     });

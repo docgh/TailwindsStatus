@@ -108,7 +108,7 @@ async function getDump1090Location(settings) {
         
         // Process the data if we got it
         if (data && Array.isArray(data) && data.length > 0) {
-          applyData(data, aircraft_status, settings, 'dump1090');
+          applyData(data, settings, 'dump1090');
         } else {
             console.warn(`Unable to get valid dump1090 data from any configured URL. Last error: ${lastError}`);
         }
@@ -135,7 +135,7 @@ async function getadsbfiLocation(settings) {
             const timeSinceCache = Date.now() - adsbfiCache.timestamp;
             if (timeSinceCache < adsbfiCacheTimeMs) {
               console.log(`Using cached ADSB.fi data (cached ${Math.round(timeSinceCache / 1000)} seconds ago)`);
-              applyData(adsbfiCache.data, aircraft_status, settings, 'adsbfi');
+              applyData(adsbfiCache.data, settings, 'adsbfi');
               return;
             }
           }
@@ -166,7 +166,7 @@ async function getadsbfiLocation(settings) {
               if (!Array.isArray(data) || data.length === 0) {
               return;
           }
-          applyData(data, aircraft_status, settings, 'adsbfi');
+          applyData(data, settings, 'adsbfi');
 
         } catch (err) {
         lastError = err.message;
@@ -175,7 +175,29 @@ async function getadsbfiLocation(settings) {
       
 }
 
-function applyData(data, aircraft_status, settings, source) {
+function saveLocationData(aircraft, lat, lon, alt) {
+  const cutoffTime = Date.now() - (30 * 60 * 1000);
+
+  if (!Array.isArray(aircraft.history)) {
+    aircraft.history = [];
+  }
+
+  aircraft.history = aircraft.history.filter((item) => {
+    if (!item || !item.timestamp) return false;
+    const ts = new Date(item.timestamp).getTime();
+    return Number.isFinite(ts) && ts >= cutoffTime;
+  });
+
+  aircraft.history.push({
+    latitude: lat,
+    longitude: lon,
+    altitude: alt,
+    timestamp: new Date()
+  });
+}
+
+
+function applyData(data, settings, source) {
       data.forEach(ac => {
         const icao24 = ac.hex;
         const existingAc = aircraft_status.find(a => a.icao24 === icao24);
@@ -189,6 +211,7 @@ function applyData(data, aircraft_status, settings, source) {
                 existingAc.latitude = ac.lat;
                 existingAc.longitude = ac.lon;  
                 existingAc.bearing = ac.track;
+                saveLocationData(existingAc, ac.lat, ac.lon, ac.altitude ? ac.altitude : (ac.alt_baro ? ac.alt_baro : ac.alt_geom));
                 existingAc.location = `Lat: ${ac.lat}, Lon: ${ac.lon}`;
                 if (ac.altitude || ac.alt_geom || ac.alt_baro) {
                   existingAc.altitude = ac.altitude ? ac.altitude : (ac.alt_baro ? ac.alt_baro : ac.alt_geom);
@@ -251,6 +274,7 @@ async function getOpenSkyLocation(settings) {
             ac.latitude = state[6];
             ac.longitude = state[5];
             ac.location = `Lat: ${state[6]}, Lon: ${state[5]}`;
+            saveLocationData(ac, state[6], state[5], state[7]);
             ac.distance = getDistanceMiles(
                 settings.airport_lat, 
                 settings.airport_lon, 
