@@ -15,10 +15,6 @@ let adsbfiCache = {
 };
 let cacheTimeMs = null;
 
-async function getAircraftLocation(settings) {
-  return await getAircraftLocations(settings, true);
-}
-
 async function getAircraftLocations(settings, useCache = false) {
 
     if (aircraft_status === null) {
@@ -407,7 +403,7 @@ function metersToFeet(meters) {
 }
 
 module.exports = {
-  getAircraftLocation,
+  getAircraftLocations,
   getOAuth2Token,
   queryOpenSkyStates,
   getDistanceMiles,

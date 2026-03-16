@@ -171,7 +171,7 @@ app.get("/api/update", async (req, res) => {
       res.json(cache);
       return;
     }
-    let aircraft = await aircraftStatus.getAircraftLocation(settings, true);  // use cache, as we are not re-pulling FSP
+    let aircraft = await aircraftStatus.getAircraftLocations(settings, true);  // use cache, as we are not re-pulling FSP
     let aircraftMap = null;
     const aircraftInFlight = aircraft.filter(ac => ac.location && ac.location.includes('Lat:') && isWithinDistance(ac));
     if (aircraftInFlight.length > 0) {
@@ -197,7 +197,7 @@ app.get("/api/aircraft", async (req, res) => {
       res.json(cached);
       return;
     }
-    let aircraft = await aircraftStatus.getAircraftLocation(settings);
+    let aircraft = await aircraftStatus.getAircraftLocations(settings);
     aircraft = await updateAircraft(aircraft, settings);
     if (!aircraft || aircraft.length === 0) {
       res.json({ aircraft: [], aircraft_map: null });
